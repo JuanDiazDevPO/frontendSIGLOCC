@@ -1,1 +1,54 @@
-/* You can add global styles to this file, and also import other style files */
+/* =========================================================
+   Design Tokens
+   ========================================================= */
+:root {
+  /* Brand colors */
+  --color-primary:       #2d7a3a;
+  --color-primary-dark:  #1a5c28;
+  --color-primary-light: #4caf50;
+  --color-accent:        #e53935;
+
+  /* Neutrals */
+  --color-text:          #212121;
+  --color-text-muted:    #757575;
+  --color-bg:            #ffffff;
+  --color-border:        #e53935;
+
+  /* Typography */
+  --font-family-base: 'Segoe UI', system-ui, sans-serif;
+  --font-size-sm:   0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg:   1.25rem;
+  --font-size-xl:   1.75rem;
+  --font-size-2xl:  2.5rem;
+  --font-size-hero: 3.5rem;
+
+  /* Spacing */
+  --space-xs:  0.25rem;
+  --space-sm:  0.5rem;
+  --space-md:  1rem;
+  --space-lg:  1.5rem;
+  --space-xl:  2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  /* Shape */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+}
+
+/* =========================================================
+   Base Reset
+   ========================================================= */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font-family-base);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
