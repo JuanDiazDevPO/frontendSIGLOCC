@@ -1,0 +1,41 @@
+.dashboard-header {
+  padding: var(--space-2xl) var(--space-2xl) var(--space-xl);
+  border-bottom: 2px solid var(--color-primary-light);
+  background: var(--color-bg);
+}
+
+.welcome-block {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.welcome-label {
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.welcome-name {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1.1;
+}
+
+.user-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+}
+
+.meta-item {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.meta-divider {
+  color: var(--color-primary-light);
+  font-weight: 700;
+}

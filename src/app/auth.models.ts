@@ -14,6 +14,8 @@ export interface Usuario {
   nombreCompleto: string;
   email: string;
   rol: string;
+  equipoId: number;
+  nombreEquipo: string;
   detallesEquipo: {
     id: number;
     nombre: string;
