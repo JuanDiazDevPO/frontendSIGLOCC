@@ -22,6 +22,14 @@ export class AuthService {
     );
   }
 
+  recuperarPassword(email: string) {
+    return this.http.post<{ message: string }>(`${this.API}/recuperar-password`, { email });
+  }
+
+  restablecerPassword(token: string, nuevaPassword: string) {
+    return this.http.post<{ message: string }>(`${this.API}/restablecer-password`, { token, nuevaPassword });
+  }
+
   logout() {
     this.session.clear();
   }

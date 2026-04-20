@@ -1,3 +1,12 @@
+export interface RecuperarPasswordRequest {
+  email: string;
+}
+
+export interface RestablecerPasswordRequest {
+  token: string;
+  nuevaPassword: string;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;

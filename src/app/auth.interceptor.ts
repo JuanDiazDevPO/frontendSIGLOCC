@@ -6,7 +6,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const session = inject(SessionService);
   const token = session.getToken();
 
-  if (!token || req.url.includes('/auth/login')) {
+  if (!token || req.url.includes('/auth/login') || req.url.includes('/auth/recuperar-password') || req.url.includes('/auth/restablecer-password')) {
     return next(req);
   }
 
