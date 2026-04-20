@@ -1,0 +1,13 @@
+<div class="alert-container">
+  @for (alert of alertService.alerts(); track alert.id) {
+    <div class="alert alert--{{ alert.type }}">
+      <span class="alert__message">{{ alert.message }}</span>
+      <button
+        class="alert__close"
+        type="button"
+        (click)="alertService.dismiss(alert.id)"
+        aria-label="Cerrar"
+      >&#x2715;</button>
+    </div>
+  }
+</div>
