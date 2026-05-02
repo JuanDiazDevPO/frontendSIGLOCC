@@ -11,6 +11,7 @@ import { Usuario } from '../auth.models';
 export class DashboardComponent implements OnInit {
   user: Usuario | null = null;
 
+  // eslint-disable-next-line @angular-eslint/prefer-inject
   constructor(private session: SessionService) {}
 
   ngOnInit() {
