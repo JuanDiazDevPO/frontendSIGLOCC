@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs';
 import { LoginRequest, LoginResponse } from './auth.models';
 import { SessionService } from './session.service';
+import { environment } from '../environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -12,7 +13,7 @@ export class AuthService {
   private http = inject(HttpClient);
   private session = inject(SessionService);
 
-  private API = 'http://localhost:8080/api/auth';
+  private API = `${environment.apiUrl}/auth`;
 
   login(data: LoginRequest) {
     return this.http.post<LoginResponse>(`${this.API}/login`, data).pipe(

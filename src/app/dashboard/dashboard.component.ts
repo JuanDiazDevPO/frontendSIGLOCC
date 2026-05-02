@@ -46,10 +46,12 @@ export class DashboardComponent {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly destroyRef = inject(DestroyRef);
 
-  user: Usuario | null = null;
+   user: Usuario | null = null;
   data: EquipoConsolidado[] = [];
   loading = true;
   error = false;
+  // eslint-disable-next-line @angular-eslint/prefer-inject
+  constructor(private session: SessionService) {}
 
   // eslint-disable-next-line @angular-eslint/prefer-inject
   constructor(private session: SessionService, private http: HttpClient) {
