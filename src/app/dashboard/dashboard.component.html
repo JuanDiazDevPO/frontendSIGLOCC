@@ -1,11 +1,244 @@
-<div class="dashboard-header">
-  <div class="welcome-block">
-    <p class="welcome-label">Bienvenido,</p>
-    <h1 class="welcome-name">{{ user?.nombreCompleto }}</h1>
-  </div>
-  <div class="user-meta">
-    <span class="meta-item">{{ user?.email }}</span>
-    <span class="meta-divider">·</span>
-    <span class="meta-item">{{ user?.nombreEquipo }}</span>
-  </div>
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-title">
+        <div class="topbar-heading">Dashboard Financiero</div>
+        <div class="topbar-sub">Consolidado por equipo · <code></code></div>
+      </div>
+      <button class="refresh-btn" (click)="fetchDashboard()" type="button" title="Actualizar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <polyline points="23 4 23 10 17 10"/>
+          <polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+      @if (loading) {
+        <div class="state-center">
+          <div class="spinner"></div>
+          <span>Cargando datos…</span>
+        </div>
+      } @else if (error) {
+        <div class="state-center">
+          <div class="state-icon">⚠️</div>
+          <div class="state-title">Error al cargar datos</div>
+          <div class="state-sub">Verifica la conexión con el servidor</div>
+          <button class="retry-btn" (click)="fetchDashboard()" type="button">Reintentar</button>
+        </div>
+      } @else if (data.length === 0) {
+        <div class="state-center">
+          <div class="state-icon">📊</div>
+          <div class="state-title">Sin datos para esta temporada</div>
+          <div class="state-sub">No se encontraron equipos registrados</div>
+        </div>
+      } @else {
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+          <!-- Presupuesto total -->
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-label">Presupuesto total</span>
+              <span class="kpi-icon">📋</span>
+            </div>
+            <div class="kpi-value">{{ cop(totals.presupuesto) }}</div>
+            <div class="kpi-sub">{{ copFull(totals.presupuesto) }}</div>
+          </div>
+
+          <!-- Total ejecutado -->
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-label">Total ejecutado</span>
+              <span class="kpi-icon">✅</span>
+            </div>
+            <div class="kpi-value">{{ cop(totals.ejecutado) }}</div>
+            <div class="kpi-sub">{{ pct(totals.ejecutado, totals.presupuesto) }}% del presupuesto</div>
+            <div class="kpi-progress-wrap">
+              <div class="kpi-progress-track">
+                <div class="kpi-progress-bar" [style.width.%]="pctClamped(totals.ejecutado, totals.presupuesto)"></div>
+              </div>
+              <span class="kpi-pct-label">{{ pct(totals.ejecutado, totals.presupuesto) }}% ejecutado</span>
+            </div>
+          </div>
+
+          <!-- Saldo disponible -->
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-label">Saldo disponible</span>
+              <span class="kpi-icon">💰</span>
+            </div>
+            <div class="kpi-value" [class.negative]="totals.saldo < 0">{{ cop(totals.saldo) }}</div>
+            <div class="kpi-sub" [class.negative]="totals.saldo < 0">
+              {{ totals.saldo < 0 ? '⚠ Saldo negativo' : 'Disponible para anticipos' }}
+            </div>
+          </div>
+
+          <!-- Equipos -->
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-label">Equipos en seguimiento</span>
+              <span class="kpi-icon">🏢</span>
+            </div>
+            <div class="kpi-value">{{ totals.conteoErl }}</div>
+            <div class="kpi-sub">{{ totals.conteoErle }} ERLE · {{ totals.conteoEnl }} ENL</div>
+          </div>
+        </div>
+
+        <!-- Split cards -->
+        <div class="split-cards">
+          <!-- Entrenamiento -->
+          <div class="split-card">
+            <div class="split-header">
+              <div class="split-title-row">
+                <div class="split-icon" style="background:#2563eb18">📚</div>
+                <span class="split-title">Entrenamiento</span>
+              </div>
+              <span class="split-badge" [class.over]="totals.ejEnt > totals.presEnt">
+                {{ totals.ejEnt > totals.presEnt ? '⚠ Sobrepasado' : pct(totals.ejEnt, totals.presEnt) + '%' }}
+              </span>
+            </div>
+            <div class="split-stats">
+              <div class="split-stat">
+                <div class="stat-label">Presupuesto</div>
+                <div class="stat-value">{{ cop(totals.presEnt) }}</div>
+              </div>
+              <div class="split-stat">
+                <div class="stat-label">Ejecutado</div>
+                <div class="stat-value" style="color:#2563eb">{{ cop(totals.ejEnt) }}</div>
+              </div>
+              <div class="split-stat">
+                <div class="stat-label">Saldo</div>
+                <div class="stat-value" [class.negative]="totals.saldoEnt < 0">{{ cop(totals.saldoEnt) }}</div>
+              </div>
+            </div>
+            <div class="progress-track">
+              <div class="progress-bar"
+                [style.width.%]="pctClamped(totals.ejEnt, totals.presEnt)"
+                [class.over]="totals.ejEnt > totals.presEnt"
+                style="background:#2563eb">
+              </div>
+            </div>
+          </div>
+
+          <!-- Mentoría -->
+          <div class="split-card">
+            <div class="split-header">
+              <div class="split-title-row">
+                <div class="split-icon" style="background:#05966918">🤝</div>
+                <span class="split-title">Mentoría</span>
+              </div>
+              <span class="split-badge" [class.over]="totals.ejMen > totals.presMen">
+                {{ totals.ejMen > totals.presMen ? '⚠ Sobrepasado' : pct(totals.ejMen, totals.presMen) + '%' }}
+              </span>
+            </div>
+            <div class="split-stats">
+              <div class="split-stat">
+                <div class="stat-label">Presupuesto</div>
+                <div class="stat-value">{{ cop(totals.presMen) }}</div>
+              </div>
+              <div class="split-stat">
+                <div class="stat-label">Ejecutado</div>
+                <div class="stat-value accent">{{ cop(totals.ejMen) }}</div>
+              </div>
+              <div class="split-stat">
+                <div class="stat-label">Saldo</div>
+                <div class="stat-value" [class.negative]="totals.saldoMen < 0">{{ cop(totals.saldoMen) }}</div>
+              </div>
+            </div>
+            <div class="progress-track">
+              <div class="progress-bar accent-bar"
+                [style.width.%]="pctClamped(totals.ejMen, totals.presMen)"
+                [class.over]="totals.ejMen > totals.presMen">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla jerárquica -->
+        <div class="table-card">
+          <div class="table-header">
+            <span class="table-title">Detalle por equipo</span>
+            <span class="table-sub">Temporada OCC 2024</span>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="col-equipo">Equipo</th>
+                  <th class="col-num">Entrenamiento</th>
+                  <th class="col-num">Mentoría</th>
+                  <th class="col-num">Total presupuesto</th>
+                  <th class="col-num">Total ejecutado</th>
+                  <th class="col-num">Saldo</th>
+                  <th class="col-avance">Avance</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of data; track row.equipoId) {
+                  <tr class="data-row" [class.row-negative]="row.granTotalSaldo < 0">
+                    <td class="col-equipo">
+                      <div class="equipo-cell" [style.padding-left.px]="indentPx(row.equipoTipo)">
+                        @if (row.equipoTipo !== 'ENL') {
+                          <div class="indent-line"></div>
+                        }
+                        <span class="tipo-chip chip-{{ row.equipoTipo.toLowerCase() }}">{{ row.equipoTipo }}</span>
+                        <span class="equipo-nombre" [class.bold]="row.equipoTipo === 'ENL'" [class.semibold]="row.equipoTipo === 'ERLE'">
+                          {{ row.equipoNombre }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="col-num">
+                      <div class="num-primary">{{ cop(row.presupuestoEntrenamiento) }}</div>
+                      <div class="num-secondary">ejec. {{ cop(row.ejecutadoEntrenamiento) }}</div>
+                    </td>
+                    <td class="col-num">
+                      <div class="num-primary">{{ cop(row.presupuestoMentoreo) }}</div>
+                      <div class="num-secondary">ejec. {{ cop(row.ejecutadoMentoreo) }}</div>
+                    </td>
+                    <td class="col-num">
+                      <div class="num-bold">{{ cop(row.granTotalPresupuesto) }}</div>
+                    </td>
+                    <td class="col-num">
+                      <div class="num-bold accent">{{ cop(row.granTotalEjecutado) }}</div>
+                    </td>
+                    <td class="col-num">
+                      <div class="num-bold" [class.negative]="row.granTotalSaldo < 0">
+                        {{ cop(row.granTotalSaldo) }}
+                        @if (row.granTotalSaldo < 0) { <span>⚠</span> }
+                      </div>
+                    </td>
+                    <td class="col-avance">
+                      <div class="avance-cell">
+                        <span class="avance-pct"
+                          [class.pct-warn]="row.granTotalSaldo < 0"
+                          [class.pct-amber]="pct(row.granTotalEjecutado, row.granTotalPresupuesto) >= 90 && row.granTotalSaldo >= 0">
+                          {{ pct(row.granTotalEjecutado, row.granTotalPresupuesto) }}%
+                        </span>
+                        <div class="progress-track">
+                          <div class="progress-bar"
+                            [style.width.%]="pctClamped(row.granTotalEjecutado, row.granTotalPresupuesto)"
+                            [class.over]="row.granTotalSaldo < 0"
+                            [class.amber-bar]="pct(row.granTotalEjecutado, row.granTotalPresupuesto) >= 90 && row.granTotalSaldo >= 0"
+                            [class.accent-bar]="row.granTotalSaldo >= 0 && pct(row.granTotalEjecutado, row.granTotalPresupuesto) < 90">
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="table-footer">
+            Cifras en COP · Saldo = Presupuesto − Ejecutado · Los valores negativos indican sobreejecución
+          </div>
+        </div>
+      }
+    </div>
+  </main>
 </div>

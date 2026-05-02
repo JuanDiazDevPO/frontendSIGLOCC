@@ -1,0 +1,35 @@
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-logo">S</div>
+    <div>
+      <div class="brand-name">SIGLOCC</div>
+      <div class="brand-sub">Admin Panel</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    @for (item of navItems; track item.label) {
+      @if (item.route) {
+        <a [routerLink]="item.route" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon">{{ item.icon }}</span>
+          {{ item.label }}
+        </a>
+      } @else {
+        <button class="nav-item" type="button">
+          <span class="nav-icon">{{ item.icon }}</span>
+          {{ item.label }}
+        </button>
+      }
+    }
+  </nav>
+
+  @if (user) {
+    <div class="sidebar-user">
+      <div class="user-avatar">{{ initials }}</div>
+      <div class="user-info">
+        <div class="user-name">{{ user.nombreCompleto }}</div>
+        <div class="user-role">{{ user.rol }}</div>
+      </div>
+    </div>
+  }
+</aside>
