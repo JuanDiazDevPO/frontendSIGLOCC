@@ -50,8 +50,7 @@ export class DashboardComponent {
   data: EquipoConsolidado[] = [];
   loading = true;
   error = false;
-  // eslint-disable-next-line @angular-eslint/prefer-inject
-  constructor(private session: SessionService) {}
+
 
   // eslint-disable-next-line @angular-eslint/prefer-inject
   constructor(private session: SessionService, private http: HttpClient) {
