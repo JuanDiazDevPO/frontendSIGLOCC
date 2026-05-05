@@ -1,3 +1,5 @@
 {
-  "framework": "angular"
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
