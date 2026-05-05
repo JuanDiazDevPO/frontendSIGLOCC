@@ -4,6 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { SessionService } from '../session.service';
 import { Usuario } from '../auth.models';
 import { Navtab } from '../navtab/navtab';
+import { environment } from '../../environments/environment';
 
 export interface EquipoConsolidado {
   equipoId: number;
@@ -65,7 +66,7 @@ export class DashboardComponent {
     this.error = false;
     this.http
       .get<EquipoConsolidado[]>(
-        'http://localhost:8080/api/v1/dashboard/consolidado?temporadaId=1'
+        `${environment.apiUrl}/v1/dashboard/consolidado?temporadaId=1`
       )
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
