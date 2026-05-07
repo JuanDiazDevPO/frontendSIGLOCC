@@ -26,6 +26,12 @@ export const routes: Routes = [
         .then(m => m.ResetPassword)
   },
   {
+    path: 'anticipos/crear',
+    loadComponent: () =>
+      import('./crear-anticipo/crear-anticipo.component')
+        .then(m => m.CrearAnticipoComponent)
+  },
+  {
     path: '',
     redirectTo: 'login',
     pathMatch: 'full'

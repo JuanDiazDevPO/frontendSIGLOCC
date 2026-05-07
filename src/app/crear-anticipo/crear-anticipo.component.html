@@ -1,0 +1,486 @@
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div>
+        <div class="topbar-heading">Nueva solicitud de anticipo</div>
+        <div class="topbar-sub">
+          <code class="endpoint-badge">POST /api/v1/anticipos</code>
+        </div>
+      </div>
+    </header>
+
+    <!-- Result screen -->
+    @if (result) {
+      <div class="result-screen">
+        <div class="result-card">
+          <div class="result-icon" [class.result-icon--ok]="result.estado === 'PENDIENTE'" [class.result-icon--err]="result.estado !== 'PENDIENTE'">
+            {{ result.estado === 'PENDIENTE' ? '✅' : '❌' }}
+          </div>
+
+          <div class="result-text">
+            <div class="result-title">
+              {{ result.estado === 'PENDIENTE' ? 'Solicitud enviada' : result.estado === 'ERROR' ? 'Error de conexión' : 'Solicitud rechazada' }}
+            </div>
+            <div class="result-message">{{ result.mensaje }}</div>
+          </div>
+
+          <div class="result-status-box" [class.result-status-box--ok]="result.estado === 'PENDIENTE'" [class.result-status-box--err]="result.estado !== 'PENDIENTE'">
+            <div>
+              <div class="result-estado-label">Estado</div>
+              <div class="result-estado-value" [class.result-estado-value--ok]="result.estado === 'PENDIENTE'" [class.result-estado-value--err]="result.estado !== 'PENDIENTE'">
+                {{ result.estado }}
+              </div>
+              @if (result.id) {
+                <div class="result-id">ID #{{ result.id }}</div>
+              }
+            </div>
+            @if (result.estado === 'PENDIENTE' && result.id) {
+              <button class="btn-download" [class.btn-download--loading]="downloadingPdf" [disabled]="downloadingPdf" (click)="downloadPdf()" type="button">
+                @if (downloadingPdf) {
+                  <span class="spinner-sm"></span>
+                } @else {
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                }
+                {{ downloadingPdf ? 'Descargando...' : 'Descargar PDF' }}
+              </button>
+            }
+          </div>
+
+          <div class="result-actions">
+            @if (result.estado === 'RECHAZADO') {
+              <button class="btn-outline" (click)="reset()" type="button">Corregir y reenviar</button>
+            }
+            <button class="btn-primary" (click)="reset()" type="button">
+              {{ result.estado === 'PENDIENTE' ? 'Nueva solicitud' : 'Cancelar' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+    } @else {
+      <div class="form-grid">
+
+        <!-- ── LEFT: Multi-step form ── -->
+        <div class="form-panel">
+
+          <!-- Step indicator -->
+          <div class="steps">
+            @for (s of steps; track s.n; let last = $last) {
+              <div class="step-item">
+                <div class="step-circle"
+                  [class.step-circle--done]="s.n < step"
+                  [class.step-circle--active]="s.n === step">
+                  @if (s.n < step) {
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  } @else {
+                    {{ s.n }}
+                  }
+                </div>
+                <span class="step-label" [class.step-label--active]="s.n === step">{{ s.label }}</span>
+              </div>
+              @if (!last) {
+                <div class="step-connector" [class.step-connector--done]="s.n < step"></div>
+              }
+            }
+          </div>
+
+          <!-- ── STEP 1: Solicitud ── -->
+          @if (step === 1) {
+            <div class="step-body">
+              <div class="step-header">
+                <div class="step-title">Información de la solicitud</div>
+                <div class="step-subtitle">Define el propósito y el monto del anticipo</div>
+              </div>
+
+              <!-- Título -->
+              <div class="field">
+                <label class="field-label">Título <span class="required">*</span></label>
+                <input
+                  class="form-input"
+                  [class.form-input--error]="err('titulo')"
+                  [(ngModel)]="form.titulo"
+                  name="titulo"
+                  type="text"
+                  placeholder="Ej: ANTICIPO 6"
+                />
+                @if (err('titulo')) {
+                  <span class="field-error">⚠ {{ err('titulo') }}</span>
+                } @else {
+                  <span class="field-hint">Nombre corto de la solicitud (ej: ANTICIPO 6)</span>
+                }
+              </div>
+
+              <!-- Descripción -->
+              <div class="field">
+                <label class="field-label">Descripción <span class="required">*</span></label>
+                <textarea
+                  class="form-input form-textarea"
+                  [class.form-input--error]="err('descripcion')"
+                  [(ngModel)]="form.descripcion"
+                  name="descripcion"
+                  placeholder="Ej: Mentoría Buga La Grande — sesión de acompañamiento junio 2024"
+                ></textarea>
+                @if (err('descripcion')) {
+                  <span class="field-error">⚠ {{ err('descripcion') }}</span>
+                } @else {
+                  <span class="field-hint">Detalla el destino o actividad del gasto</span>
+                }
+              </div>
+
+              <!-- Rubro presupuestal -->
+              <div class="field">
+                <label class="field-label">Rubro presupuestal <span class="required">*</span></label>
+                <div class="rubro-grid">
+                  <div class="rubro-card"
+                    [class.rubro-card--selected]="form.tipoPresupuesto === 'ENTRENAMIENTO'"
+                    (click)="selectRubro('ENTRENAMIENTO')"
+                    role="button"
+                    tabindex="0"
+                    (keydown.enter)="selectRubro('ENTRENAMIENTO')"
+                    (keydown.space)="selectRubro('ENTRENAMIENTO')">
+                    <div class="rubro-name" [class.rubro-name--selected]="form.tipoPresupuesto === 'ENTRENAMIENTO'">📚 ENTRENAMIENTO</div>
+                    <div class="rubro-saldo">Saldo: <strong>{{ cop(SALDO_DISPONIBLE['ENTRENAMIENTO']) }}</strong></div>
+                  </div>
+                  <div class="rubro-card"
+                    [class.rubro-card--selected]="form.tipoPresupuesto === 'MENTOREO'"
+                    (click)="selectRubro('MENTOREO')"
+                    role="button"
+                    tabindex="0"
+                    (keydown.enter)="selectRubro('MENTOREO')"
+                    (keydown.space)="selectRubro('MENTOREO')">
+                    <div class="rubro-name" [class.rubro-name--selected]="form.tipoPresupuesto === 'MENTOREO'">🤝 MENTOREO</div>
+                    <div class="rubro-saldo">Saldo: <strong>{{ cop(SALDO_DISPONIBLE['MENTOREO']) }}</strong></div>
+                  </div>
+                </div>
+                @if (err('tipoPresupuesto')) {
+                  <span class="field-error">⚠ {{ err('tipoPresupuesto') }}</span>
+                }
+              </div>
+
+              <!-- Monto -->
+              <div class="field">
+                <label class="field-label">Monto solicitado (COP) <span class="required">*</span></label>
+                <div class="monto-wrap">
+                  <span class="monto-prefix">$</span>
+                  <input
+                    class="form-input form-input--monto"
+                    [class.form-input--error]="err('montoSolicitado')"
+                    [value]="form.montoSolicitado"
+                    (input)="filterDigits($event, 'montoSolicitado')"
+                    name="montoSolicitado"
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="0"
+                  />
+                </div>
+                @if (err('montoSolicitado')) {
+                  <span class="field-error">⚠ {{ err('montoSolicitado') }}</span>
+                } @else if (form.montoSolicitado) {
+                  <span class="field-hint">{{ montoNum.toLocaleString('es-CO') }} COP</span>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- ── STEP 2: Solicitante ── -->
+          @if (step === 2) {
+            <div class="step-body">
+              <div class="step-header">
+                <div class="step-title">Datos del solicitante</div>
+                <div class="step-subtitle">Información de quien realiza la solicitud</div>
+              </div>
+
+              <div class="auto-banner">
+                <strong class="auto-banner__title">Resuelto automáticamente por el backend:</strong><br />
+                <span class="mono">usuarioId</span>, <span class="mono">equipoId</span> y <span class="mono">temporadaId</span> se toman del JWT de sesión.
+              </div>
+
+              <!-- Ciudad -->
+              <div class="field">
+                <label class="field-label">Ciudad <span class="required">*</span></label>
+                <select
+                  class="form-input form-select"
+                  [class.form-input--error]="err('ciudad')"
+                  [(ngModel)]="form.ciudad"
+                  name="ciudad">
+                  <option value="">Selecciona ciudad</option>
+                  @for (c of CIUDADES; track c) {
+                    <option [value]="c">{{ c }}</option>
+                  }
+                </select>
+                @if (err('ciudad')) {
+                  <span class="field-error">⚠ {{ err('ciudad') }}</span>
+                } @else {
+                  <span class="field-hint">Ciudad desde donde se origina la solicitud</span>
+                }
+              </div>
+
+              <!-- Cédula -->
+              <div class="field">
+                <label class="field-label">Cédula del solicitante <span class="required">*</span></label>
+                <input
+                  class="form-input"
+                  [class.form-input--error]="err('cedula')"
+                  [value]="form.cedula"
+                  (input)="filterDigits($event, 'cedula')"
+                  name="cedula"
+                  type="text"
+                  inputmode="numeric"
+                  placeholder="Ej: 1192906360"
+                />
+                @if (err('cedula')) {
+                  <span class="field-error">⚠ {{ err('cedula') }}</span>
+                } @else {
+                  <span class="field-hint">Número de documento de identidad</span>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- ── STEP 3: Datos bancarios ── -->
+          @if (step === 3) {
+            <div class="step-body">
+              <div class="step-header">
+                <div class="step-title">Datos bancarios</div>
+                <div class="step-subtitle">Cuenta destino para el giro del anticipo</div>
+              </div>
+
+              <div class="two-col">
+                <!-- Banco -->
+                <div class="field">
+                  <label class="field-label">Banco <span class="required">*</span></label>
+                  <select
+                    class="form-input form-select"
+                    [class.form-input--error]="err('banco')"
+                    [(ngModel)]="form.banco"
+                    name="banco">
+                    <option value="">Seleccionar banco</option>
+                    @for (b of BANCOS; track b) {
+                      <option [value]="b">{{ b }}</option>
+                    }
+                  </select>
+                  @if (err('banco')) {
+                    <span class="field-error">⚠ {{ err('banco') }}</span>
+                  }
+                </div>
+
+                <!-- Tipo de cuenta -->
+                <div class="field">
+                  <label class="field-label">Tipo de cuenta <span class="required">*</span></label>
+                  <select
+                    class="form-input form-select"
+                    [class.form-input--error]="err('tipoCuenta')"
+                    [(ngModel)]="form.tipoCuenta"
+                    name="tipoCuenta">
+                    <option value="">Seleccionar tipo</option>
+                    @for (t of TIPOS_CUENTA; track t) {
+                      <option [value]="t">{{ t }}</option>
+                    }
+                  </select>
+                  @if (err('tipoCuenta')) {
+                    <span class="field-error">⚠ {{ err('tipoCuenta') }}</span>
+                  }
+                </div>
+              </div>
+
+              <!-- Número de cuenta -->
+              <div class="field">
+                <label class="field-label">Número de cuenta <span class="required">*</span></label>
+                <input
+                  class="form-input"
+                  [class.form-input--error]="err('numeroCuenta')"
+                  [value]="form.numeroCuenta"
+                  (input)="filterDigits($event, 'numeroCuenta')"
+                  name="numeroCuenta"
+                  type="text"
+                  inputmode="numeric"
+                  placeholder="Ej: 4012567845"
+                />
+                @if (err('numeroCuenta')) {
+                  <span class="field-error">⚠ {{ err('numeroCuenta') }}</span>
+                }
+              </div>
+
+              <!-- Titular -->
+              <div class="titular-section">
+                <div class="titular-label">Titular de la cuenta</div>
+
+                <div class="field">
+                  <label class="field-label">Nombre completo del titular <span class="required">*</span></label>
+                  <input
+                    class="form-input"
+                    [class.form-input--error]="err('nombreTitular')"
+                    [(ngModel)]="form.nombreTitular"
+                    name="nombreTitular"
+                    type="text"
+                    placeholder="Ej: Juan Pablo Muñoz"
+                  />
+                  @if (err('nombreTitular')) {
+                    <span class="field-error">⚠ {{ err('nombreTitular') }}</span>
+                  }
+                </div>
+
+                <div class="field">
+                  <label class="field-label">Cédula del titular <span class="required">*</span></label>
+                  <input
+                    class="form-input"
+                    [class.form-input--error]="err('cedulaTitular')"
+                    [value]="form.cedulaTitular"
+                    (input)="filterDigits($event, 'cedulaTitular')"
+                    name="cedulaTitular"
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="Ej: 1192906360"
+                  />
+                  @if (err('cedulaTitular')) {
+                    <span class="field-error">⚠ {{ err('cedulaTitular') }}</span>
+                  } @else {
+                    <span class="field-hint">Puede ser igual a la cédula del solicitante</span>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Navigation buttons -->
+          <div class="nav-buttons">
+            @if (step > 1) {
+              <button class="btn-prev" (click)="prev()" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                  <polyline points="15 18 9 12 15 6"/>
+                </svg>
+                Anterior
+              </button>
+            } @else {
+              <div></div>
+            }
+
+            @if (step < 3) {
+              <button class="btn-primary" (click)="next()" type="button">
+                Siguiente
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+            } @else {
+              <button class="btn-submit" [class.btn-submit--loading]="loading" (click)="submit()" [disabled]="loading" type="button">
+                @if (loading) {
+                  <span class="spinner-sm"></span> Enviando...
+                } @else {
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                  </svg>
+                  Enviar solicitud
+                }
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- ── RIGHT: Live summary ── -->
+        <div class="summary-panel">
+          <div class="summary-panel__title">Vista previa</div>
+
+          <!-- Monto destacado -->
+          <div class="summary-monto"
+            [class.summary-monto--active]="montoNum > 0"
+            [class.summary-monto--excede]="excede">
+            <div class="summary-monto__label">Monto solicitado</div>
+            <div class="summary-monto__value"
+              [class.summary-monto__value--active]="montoNum > 0 && !excede"
+              [class.summary-monto__value--excede]="excede">
+              {{ montoNum > 0 ? cop(montoNum) : '$0' }}
+            </div>
+
+            @if (form.tipoPresupuesto && saldoDisponible !== null) {
+              <div class="summary-saldo">
+                Saldo disponible ({{ form.tipoPresupuesto }}):
+                <strong [class.text-error]="excede">{{ cop(saldoDisponible) }}</strong>
+              </div>
+              <div class="progress-track">
+                <div class="progress-bar"
+                  [class.progress-bar--excede]="excede"
+                  [style.width.%]="montoProgressPct">
+                </div>
+              </div>
+            }
+
+            @if (excede) {
+              <div class="summary-warn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                Excede el saldo — será rechazado automáticamente
+              </div>
+            }
+          </div>
+
+          <!-- Request summary table -->
+          <div class="summary-table">
+            <div class="summary-table__head">Resumen del request</div>
+            <div class="summary-table__body">
+              <div class="summary-row">
+                <span class="summary-row__key">título</span>
+                <span class="summary-row__val">{{ fmt(form.titulo) }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-row__key">tipoPresupuesto</span>
+                <span class="summary-row__val summary-row__val--accent">{{ fmt(form.tipoPresupuesto) }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-row__key">descripcion</span>
+                <span class="summary-row__val">{{ fmt(form.descripcion) }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-row__key">montoSolicitado</span>
+                <span class="summary-row__val summary-row__val--accent">{{ montoNum > 0 ? montoNum.toLocaleString('es-CO') : '—' }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-row__key">ciudad</span>
+                <span class="summary-row__val">{{ fmt(form.ciudad) }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-row__key">cedula</span>
+                <span class="summary-row__val">{{ fmt(form.cedula) }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-row__key">banco</span>
+                <span class="summary-row__val">{{ fmt(form.banco) }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-row__key">tipoCuenta</span>
+                <span class="summary-row__val">{{ fmt(form.tipoCuenta) }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-row__key">numeroCuenta</span>
+                <span class="summary-row__val">{{ fmt(form.numeroCuenta) }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-row__key">nombreTitular</span>
+                <span class="summary-row__val">{{ fmt(form.nombreTitular) }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-row__key">cedulaTitular</span>
+                <span class="summary-row__val">{{ fmt(form.cedulaTitular) }}</span>
+              </div>
+            </div>
+            <div class="summary-table__foot">
+              <span class="auto-resolved-label">Auto-resuelto por el backend:</span><br />
+              usuarioId · equipoId · temporadaId
+            </div>
+          </div>
+        </div>
+
+      </div>
+    }
+  </main>
+</div>

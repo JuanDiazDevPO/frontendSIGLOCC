@@ -24,7 +24,7 @@ export class Navtab {
     { icon: '⛪', label: 'Iglesias',     route: null },
     { icon: '📦', label: 'Asignaciones', route: null },
     { icon: '🚚', label: 'Entregas',     route: null },
-    { icon: '💰', label: 'Anticipos',    route: null },
+    { icon: '💰', label: 'Anticipos',    route: '/anticipos/crear' },
     { icon: '👥', label: 'Usuarios',     route: null },
   ];
 
