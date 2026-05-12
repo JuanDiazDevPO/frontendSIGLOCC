@@ -7,7 +7,7 @@
       <div>
         <div class="topbar-heading">Nueva solicitud de anticipo</div>
         <div class="topbar-sub">
-          <code class="endpoint-badge">POST /api/v1/anticipos</code>
+          <code class="endpoint-badge"></code>
         </div>
       </div>
     </header>
@@ -101,8 +101,9 @@
 
               <!-- Título -->
               <div class="field">
-                <label class="field-label">Título <span class="required">*</span></label>
+                <label class="field-label" for="titulo">Título <span class="required">*</span></label>
                 <input
+                  id="titulo"
                   class="form-input"
                   [class.form-input--error]="err('titulo')"
                   [(ngModel)]="form.titulo"
@@ -119,8 +120,9 @@
 
               <!-- Descripción -->
               <div class="field">
-                <label class="field-label">Descripción <span class="required">*</span></label>
+                <label class="field-label" for="descripcion">Descripción <span class="required">*</span></label>
                 <textarea
+                  id="descripcion"
                   class="form-input form-textarea"
                   [class.form-input--error]="err('descripcion')"
                   [(ngModel)]="form.descripcion"
@@ -136,7 +138,7 @@
 
               <!-- Rubro presupuestal -->
               <div class="field">
-                <label class="field-label">Rubro presupuestal <span class="required">*</span></label>
+                <div class="field-label">Rubro presupuestal <span class="required">*</span></div>
                 <div class="rubro-grid">
                   <div class="rubro-card"
                     [class.rubro-card--selected]="form.tipoPresupuesto === 'ENTRENAMIENTO'"
@@ -166,10 +168,11 @@
 
               <!-- Monto -->
               <div class="field">
-                <label class="field-label">Monto solicitado (COP) <span class="required">*</span></label>
+                <label class="field-label" for="montoSolicitado">Monto solicitado (COP) <span class="required">*</span></label>
                 <div class="monto-wrap">
                   <span class="monto-prefix">$</span>
                   <input
+                    id="montoSolicitado"
                     class="form-input form-input--monto"
                     [class.form-input--error]="err('montoSolicitado')"
                     [value]="form.montoSolicitado"
@@ -204,8 +207,9 @@
 
               <!-- Ciudad -->
               <div class="field">
-                <label class="field-label">Ciudad <span class="required">*</span></label>
+                <label class="field-label" for="ciudad">Ciudad <span class="required">*</span></label>
                 <select
+                  id="ciudad"
                   class="form-input form-select"
                   [class.form-input--error]="err('ciudad')"
                   [(ngModel)]="form.ciudad"
@@ -224,8 +228,9 @@
 
               <!-- Cédula -->
               <div class="field">
-                <label class="field-label">Cédula del solicitante <span class="required">*</span></label>
+                <label class="field-label" for="cedula">Cédula del solicitante <span class="required">*</span></label>
                 <input
+                  id="cedula"
                   class="form-input"
                   [class.form-input--error]="err('cedula')"
                   [value]="form.cedula"
@@ -255,8 +260,9 @@
               <div class="two-col">
                 <!-- Banco -->
                 <div class="field">
-                  <label class="field-label">Banco <span class="required">*</span></label>
+                  <label class="field-label" for="banco">Banco <span class="required">*</span></label>
                   <select
+                    id="banco"
                     class="form-input form-select"
                     [class.form-input--error]="err('banco')"
                     [(ngModel)]="form.banco"
@@ -273,8 +279,9 @@
 
                 <!-- Tipo de cuenta -->
                 <div class="field">
-                  <label class="field-label">Tipo de cuenta <span class="required">*</span></label>
+                  <label class="field-label" for="tipoCuenta">Tipo de cuenta <span class="required">*</span></label>
                   <select
+                    id="tipoCuenta"
                     class="form-input form-select"
                     [class.form-input--error]="err('tipoCuenta')"
                     [(ngModel)]="form.tipoCuenta"
@@ -292,8 +299,9 @@
 
               <!-- Número de cuenta -->
               <div class="field">
-                <label class="field-label">Número de cuenta <span class="required">*</span></label>
+                <label class="field-label" for="numeroCuenta">Número de cuenta <span class="required">*</span></label>
                 <input
+                  id="numeroCuenta"
                   class="form-input"
                   [class.form-input--error]="err('numeroCuenta')"
                   [value]="form.numeroCuenta"
@@ -313,8 +321,9 @@
                 <div class="titular-label">Titular de la cuenta</div>
 
                 <div class="field">
-                  <label class="field-label">Nombre completo del titular <span class="required">*</span></label>
+                  <label class="field-label" for="nombreTitular">Nombre completo del titular <span class="required">*</span></label>
                   <input
+                    id="nombreTitular"
                     class="form-input"
                     [class.form-input--error]="err('nombreTitular')"
                     [(ngModel)]="form.nombreTitular"
@@ -328,8 +337,9 @@
                 </div>
 
                 <div class="field">
-                  <label class="field-label">Cédula del titular <span class="required">*</span></label>
+                  <label class="field-label" for="cedulaTitular">Cédula del titular <span class="required">*</span></label>
                   <input
+                    id="cedulaTitular"
                     class="form-input"
                     [class.form-input--error]="err('cedulaTitular')"
                     [value]="form.cedulaTitular"
