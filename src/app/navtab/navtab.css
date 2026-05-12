@@ -104,6 +104,32 @@
   border-top: 1px solid #e9eaec;
 }
 
+.signout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #9ca3af;
+  transition: background 0.15s, color 0.15s;
+}
+
+.signout-btn:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.signout-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
 .user-avatar {
   width: 30px;
   height: 30px;
