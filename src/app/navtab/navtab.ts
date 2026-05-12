@@ -1,6 +1,7 @@
-import { Component, Input } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Component, Input, inject } from '@angular/core';
+import { RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { Usuario } from '../auth.models';
+import { AuthService } from '../auth.service';
 
 interface NavItem {
   icon: string;
@@ -17,6 +18,14 @@ interface NavItem {
 })
 export class Navtab {
   @Input() user: Usuario | null = null;
+
+  private auth = inject(AuthService);
+  private router = inject(Router);
+
+  signOut() {
+    this.auth.logout();
+    this.router.navigate(['/login']);
+  }
 
   navItems: NavItem[] = [
     { icon: '◈', label: 'Dashboard',    route: '/dashboard' },
