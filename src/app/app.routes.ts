@@ -43,6 +43,13 @@ export const routes: Routes = [
         .then(m => m.CrearPresupuestoComponent)
   },
   {
+    path: 'usuarios',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./create-users/create-users')
+        .then(m => m.CreateUsers)
+  },
+  {
     path: 'reportes/mensual',
     canActivate: [authGuard],
     loadComponent: () =>

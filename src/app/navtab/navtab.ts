@@ -36,7 +36,7 @@ export class Navtab {
     { icon: '💰', label: 'Anticipos',    route: '/anticipos/crear' },
     { icon: '📊', label: 'Presupuestos', route: '/presupuestos/crear' },
     { icon: '📝', label: 'Reportes',     route: '/reportes/mensual' },
-    { icon: '👥', label: 'Usuarios',     route: null },
+    { icon: '👥', label: 'Usuarios',     route: '/usuarios' },
   ];
 
   get initials(): string {
