@@ -344,6 +344,7 @@
 
           <!-- CSV Result -->
           @if (csvResult) {
+            <!-- Summary card -->
             <div class="csv-result">
               <div class="csv-result__header" [class.csv-result__header--ok]="csvResult.fallidos === 0">
                 <span class="csv-result__emoji">{{ csvResult.fallidos === 0 ? '✅' : '⚠️' }}</span>
@@ -359,7 +360,7 @@
                   <div class="csv-stat__value">{{ csvResult.procesados }}</div>
                   <div class="csv-stat__label">Procesadas</div>
                 </div>
-                <div class="csv-stat csv-stat--ok">
+                <div class="csv-stat">
                   <div class="csv-stat__value csv-stat__value--ok">{{ csvResult.exitosos }}</div>
                   <div class="csv-stat__label">Exitosas</div>
                 </div>
@@ -368,7 +369,8 @@
                   <div class="csv-stat__label">Fallidas</div>
                 </div>
               </div>
-              @if (csvResult.errores.length > 0) {
+              <!-- Fallback error list when no row detail available -->
+              @if (!csvResult.filas?.length && csvResult.errores?.length) {
                 <div class="csv-result__errors">
                   <div class="csv-result__errors-title">Detalle de errores</div>
                   @for (e of csvResult.errores; track e) {
@@ -381,11 +383,109 @@
                     </div>
                   }
                 </div>
+                <div class="csv-result__footer">
+                  <button class="btn-outline" (click)="resetCsv()" type="button">Nueva carga</button>
+                </div>
               }
-              <div class="csv-result__footer">
-                <button class="btn-outline" (click)="resetCsv()" type="button">Nueva carga</button>
-              </div>
+              @if (!csvResult.filas?.length && !csvResult.errores?.length) {
+                <div class="csv-result__footer">
+                  <button class="btn-outline" (click)="resetCsv()" type="button">Nueva carga</button>
+                </div>
+              }
             </div>
+
+            <!-- Detailed per-row table -->
+            @if (csvResult.filas?.length) {
+              <div class="csv-rows-panel">
+                <div class="csv-rows-panel__header">
+                  <div class="csv-rows-panel__title">Detalle por fila</div>
+                  <div class="csv-filtro-tabs">
+                    <button class="csv-filtro-tab"
+                      [class.csv-filtro-tab--active]="csvFiltro === 'todos'"
+                      (click)="csvFiltro = 'todos'" type="button">
+                      Todas
+                      <span class="csv-filtro-count">{{ csvResult.procesados }}</span>
+                    </button>
+                    <button class="csv-filtro-tab"
+                      [class.csv-filtro-tab--active]="csvFiltro === 'OK'"
+                      [class.csv-filtro-tab--ok]="csvFiltro === 'OK'"
+                      (click)="csvFiltro = 'OK'" type="button">
+                      Exitosas
+                      <span class="csv-filtro-count" [class.csv-filtro-count--ok]="csvFiltro === 'OK'">{{ csvResult.exitosos }}</span>
+                    </button>
+                    <button class="csv-filtro-tab"
+                      [class.csv-filtro-tab--active]="csvFiltro === 'ERROR'"
+                      [class.csv-filtro-tab--err]="csvFiltro === 'ERROR'"
+                      (click)="csvFiltro = 'ERROR'" type="button">
+                      Fallidas
+                      <span class="csv-filtro-count" [class.csv-filtro-count--err]="csvFiltro === 'ERROR'">{{ csvResult.fallidos }}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="csv-rows-table-wrap">
+                  <table class="csv-rows-table">
+                    <thead>
+                      <tr>
+                        <th class="col-fila">Fila</th>
+                        <th class="col-estado">Estado</th>
+                        <th class="col-equipo">Equipo</th>
+                        @for (col of CSV_COLUMNS; track col.col) {
+                          <th class="col-data"><code>{{ col.col }}</code></th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of csvFilasFiltered; track row.numeroFila) {
+                        <tr [class.row--error]="row.status === 'ERROR'">
+                          <td class="col-fila-cell">{{ row.numeroFila }}</td>
+                          <td class="col-estado-cell">
+                            <span class="status-badge"
+                              [class.status-badge--ok]="row.status === 'OK'"
+                              [class.status-badge--err]="row.status === 'ERROR'">
+                              {{ row.status === 'OK' ? '✓ OK' : '✕ Error' }}
+                            </span>
+                          </td>
+                          <td class="col-equipo-cell">
+                            {{ row.equipoNombre ?? '—' }}
+                          </td>
+                          @for (val of row.data; track $index) {
+                            <td class="col-data-cell" [class.col-data-cell--empty]="!val">
+                              @if (!val) { <span class="val-empty">(vacío)</span> } @else { {{ val }} }
+                            </td>
+                          }
+                        </tr>
+                        @if (row.status === 'ERROR' && row.mensaje) {
+                          <tr class="row--error-msg">
+                            <td [attr.colspan]="3 + CSV_COLUMNS.length">
+                              <div class="error-inline-msg">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                                </svg>
+                                {{ row.mensaje }}
+                              </div>
+                            </td>
+                          </tr>
+                        }
+                      }
+                      @if (csvFilasFiltered.length === 0) {
+                        <tr>
+                          <td [attr.colspan]="3 + CSV_COLUMNS.length" class="empty-rows-cell">
+                            Sin filas en esta categoría
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="csv-rows-footer">
+                  <span class="csv-rows-tip">💡 Las filas con error pueden corregirse en el archivo y reintentar el cargue.</span>
+                  <button class="btn-outline" (click)="resetCsv()" type="button">Nueva carga</button>
+                </div>
+              </div>
+            }
           }
 
           <!-- Format reference -->
