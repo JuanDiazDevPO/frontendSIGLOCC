@@ -56,11 +56,20 @@ interface PresupuestoResult {
   temporadaNombre: string;
 }
 
+interface CsvFila {
+  numeroFila: number;
+  status: 'OK' | 'ERROR';
+  data: string[];
+  equipoNombre: string | null;
+  mensaje: string | null;
+}
+
 interface CsvResult {
   procesados: number;
   exitosos: number;
   fallidos: number;
-  errores: string[];
+  filas?: CsvFila[];
+  errores?: string[];
 }
 
 const EMPTY_FORM: PresupuestoForm = {
@@ -100,6 +109,14 @@ export class CrearPresupuestoComponent implements OnInit {
   csvDrag = false;
   csvLoading = false;
   csvResult: CsvResult | null = null;
+  csvFiltro: 'todos' | 'OK' | 'ERROR' = 'todos';
+
+  get csvFilasFiltered(): CsvFila[] {
+    const filas = this.csvResult?.filas;
+    if (!filas) return [];
+    if (this.csvFiltro === 'todos') return filas;
+    return filas.filter(f => f.status === this.csvFiltro);
+  }
 
   equipos: Equipo[] = [];
   equiposLoading = false;
@@ -300,17 +317,29 @@ export class CrearPresupuestoComponent implements OnInit {
     if (!this.csvFile) return;
     this.csvLoading = true;
 
+    const file = this.csvFile;
     const formData = new FormData();
-    formData.append('archivo', this.csvFile);
+    formData.append('archivo', file);
 
     this.http
       .post<CsvResult>(`${environment.apiUrl}/v1/presupuestos/upload`, formData)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: res => {
-          this.csvLoading = false;
-          this.csvResult  = res;
-          this.cdr.detectChanges();
+          if (!res.filas?.length) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const content = e.target?.result as string;
+              this.csvLoading = false;
+              this.csvResult  = { ...res, filas: this.buildFilasFromCsv(content, res.errores ?? []) };
+              this.cdr.detectChanges();
+            };
+            reader.readAsText(file);
+          } else {
+            this.csvLoading = false;
+            this.csvResult  = res;
+            this.cdr.detectChanges();
+          }
         },
         error: (err: HttpErrorResponse) => {
           this.csvLoading = false;
@@ -318,6 +347,7 @@ export class CrearPresupuestoComponent implements OnInit {
             procesados: 0,
             exitosos:   0,
             fallidos:   1,
+            filas:      [],
             errores:    [this.httpErrorMessage(err)],
           };
           this.cdr.detectChanges();
@@ -325,9 +355,41 @@ export class CrearPresupuestoComponent implements OnInit {
       });
   }
 
+  private parseErrorFila(e: string): { fila: number; mensaje: string } | null {
+    const m = e.match(/^Fila\s+(\d+):\s*(.+)$/i);
+    return m ? { fila: parseInt(m[1], 10), mensaje: m[2].trim() } : null;
+  }
+
+  private buildFilasFromCsv(content: string, errores: string[]): CsvFila[] {
+    const errorMap = new Map<number, string>();
+    for (const e of errores) {
+      const parsed = this.parseErrorFila(e);
+      if (parsed) errorMap.set(parsed.fila, parsed.mensaje);
+    }
+
+    const lines = content.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+    const dataLines = lines.slice(1); // skip header row
+
+    return dataLines.map((line, i) => {
+      const rowNum  = i + 2; // row 1 is the header
+      const data    = line.split(',').map(v => v.trim());
+      const equipoId = parseInt(data[0], 10);
+      const equipo  = this.equipos.find(eq => eq.id === equipoId);
+      const isError = errorMap.has(rowNum);
+      return {
+        numeroFila:   rowNum,
+        status:       isError ? 'ERROR' : 'OK',
+        data,
+        equipoNombre: equipo?.nombre ?? null,
+        mensaje:      errorMap.get(rowNum) ?? null,
+      };
+    });
+  }
+
   resetCsv(): void {
-    this.csvFile   = null;
-    this.csvResult = null;
+    this.csvFile    = null;
+    this.csvResult  = null;
+    this.csvFiltro  = 'todos';
   }
 
   get csvFileSizeKb(): string {
