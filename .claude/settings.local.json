@@ -7,7 +7,8 @@
       "Bash(python -c ' *)",
       "Bash(npx tsc *)",
       "Bash(gunzip -c \"/Users/juan/.claude/projects/-Users-juan-learningProjects-frontendSIGLOCC/2c90a2dd-b12b-43d3-97d0-7dd62c35eb8d/tool-results/webfetch-1778952708762-biyz1t.bin\")",
-      "Bash(tar -x -O \"siglocc/project/Crear Presupuesto.html\")"
+      "Bash(tar -x -O \"siglocc/project/Crear Presupuesto.html\")",
+      "Bash(python -c \"import gzip, shutil; shutil.copyfileobj\\(gzip.open\\('webfetch-1778955399463-vz0hqf.bin'\\), open\\('design_out.html', 'wb'\\)\\)\")"
     ]
   }
 }

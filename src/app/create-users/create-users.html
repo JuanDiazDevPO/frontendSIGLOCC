@@ -1,0 +1,439 @@
+<div class="app-layout">
+  <app-navtab [user]="sessionUser" />
+
+  <main class="main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div>
+        <div class="topbar-heading">Gestión de Usuarios</div>
+        <div class="topbar-sub">
+          {{ usuarios.length }} registrados ·
+          <span class="stat-activos">{{ totalActivos }} activos</span> ·
+          <span class="stat-inactivos">{{ totalInactivos }} inactivos</span>
+        </div>
+      </div>
+      <button class="btn-crear" (click)="openDrawer()" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Crear usuario
+      </button>
+    </header>
+
+    <!-- Content -->
+    <div class="content-area">
+
+      <!-- Search + filters -->
+      <div class="filters-row">
+        <div class="search-wrap">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input class="search-input" [(ngModel)]="search" placeholder="Buscar por nombre, correo, rol…" type="text" />
+        </div>
+
+        <div class="filter-tabs">
+          @for (f of FILTROS; track f.id) {
+            <button
+              class="filter-tab"
+              [class.filter-tab--active]="estadoFiltro === f.id"
+              (click)="setEstadoFiltro(f.id)"
+              type="button">
+              {{ f.label }}
+              <span class="filter-count" [class.filter-count--active]="estadoFiltro === f.id">
+                {{ getFilterCount(f.id) }}
+              </span>
+            </button>
+          }
+        </div>
+
+        <div class="results-count">{{ filtered.length }} resultado{{ filtered.length !== 1 ? 's' : '' }}</div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-card">
+        <table class="users-table">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Correo</th>
+              <th>Rol</th>
+              <th>Equipo</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of filtered; track u.id) {
+              <tr [class.row--inactive]="!u.activo">
+                <td class="td-user">
+                  <div class="user-cell">
+                    <div class="avatar" [style.background]="getAvatarColor(u.name, u.lastname)" [class.avatar--faded]="!u.activo">
+                      {{ getAvatarInitials(u.name, u.lastname) }}
+                    </div>
+                    <div>
+                      <div class="user-name" [class.user-name--strikethrough]="!u.activo">{{ u.name }} {{ u.lastname }}</div>
+                      <div class="user-id">ID #{{ u.id }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="td-email">{{ u.email }}</td>
+                <td class="td-rol">
+                  <span class="role-badge" [ngStyle]="getRoleBadgeStyle(u.rol)">{{ u.rol }}</span>
+                </td>
+                <td class="td-equipo">{{ u.equipo }}</td>
+                <td class="td-estado">
+                  <span class="status-badge" [class.status-badge--active]="u.activo" [class.status-badge--inactive]="!u.activo">
+                    <span class="status-dot"></span>
+                    {{ u.activo ? 'Activo' : 'Inactivo' }}
+                  </span>
+                </td>
+                <td class="td-actions">
+                  <div class="row-menu-wrap">
+                    <button class="btn-more" (click)="toggleMenu(u.id, $event)" type="button" [class.btn-more--open]="menuOpenId === u.id">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <circle cx="12" cy="5"  r="1.3" fill="currentColor"/>
+                        <circle cx="12" cy="12" r="1.3" fill="currentColor"/>
+                        <circle cx="12" cy="19" r="1.3" fill="currentColor"/>
+                      </svg>
+                    </button>
+                    @if (menuOpenId === u.id) {
+                      <div class="row-menu">
+                        @if (u.activo) {
+                          <button class="row-menu-item row-menu-item--danger"
+                            (click)="openConfirm(u, 'inactivate', $event)" type="button">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                              <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                            </svg>
+                            Inactivar usuario
+                          </button>
+                        } @else {
+                          <button class="row-menu-item row-menu-item--success"
+                            (click)="openConfirm(u, 'reactivate', $event)" type="button">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                              <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                            </svg>
+                            Reactivar usuario
+                          </button>
+                        }
+                      </div>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        @if (filtered.length === 0) {
+          <div class="empty-state">
+            @if (search) {
+              Sin resultados para "{{ search }}"
+            } @else {
+              No hay usuarios en esta categoría
+            }
+          </div>
+        }
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Drawer overlay -->
+  <div class="overlay" [class.overlay--open]="drawerOpen" (click)="closeDrawer()"></div>
+
+  <!-- Drawer panel -->
+  <div class="drawer" [class.drawer--open]="drawerOpen">
+
+    <!-- Header -->
+    <div class="drawer-header">
+      <div>
+        <div class="drawer-title">Crear nuevo usuario</div>
+        <div class="drawer-sub">Completa los datos del nuevo miembro del equipo</div>
+      </div>
+      <button class="btn-close" (click)="closeDrawer()" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Form body -->
+    <div class="drawer-body">
+
+      <!-- Información personal -->
+      <div class="drawer-section">
+        <div class="section-label">Información personal</div>
+        <div class="grid-2">
+          <div class="field">
+            <label class="field-label">Nombre <span class="required">*</span></label>
+            <input class="form-input" [class.form-input--error]="submitted && errors.name"
+              [(ngModel)]="form.name" placeholder="Ej: Andrea" type="text" />
+            @if (submitted && errors.name) {
+              <span class="field-error">⚠ {{ errors.name }}</span>
+            }
+          </div>
+          <div class="field">
+            <label class="field-label">Apellido <span class="required">*</span></label>
+            <input class="form-input" [class.form-input--error]="submitted && errors.lastname"
+              [(ngModel)]="form.lastname" placeholder="Ej: Morales" type="text" />
+            @if (submitted && errors.lastname) {
+              <span class="field-error">⚠ {{ errors.lastname }}</span>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Credenciales de acceso -->
+      <div class="drawer-section drawer-section--divided">
+        <div class="section-label">Credenciales de acceso</div>
+
+        <div class="field">
+          <label class="field-label">Correo electrónico <span class="required">*</span></label>
+          <input class="form-input" [class.form-input--error]="submitted && errors.email"
+            [(ngModel)]="form.email" placeholder="usuario@occ.org" type="email" />
+          @if (submitted && errors.email) {
+            <span class="field-error">⚠ {{ errors.email }}</span>
+          } @else {
+            <span class="field-hint">Se usará para iniciar sesión</span>
+          }
+        </div>
+
+        <div class="field">
+          <label class="field-label">Contraseña <span class="required">*</span></label>
+          <div class="input-wrap">
+            <input class="form-input" [class.form-input--error]="submitted && errors.password"
+              [(ngModel)]="form.password" placeholder="Mínimo 8 caracteres"
+              [type]="showPass ? 'text' : 'password'" />
+            <button class="btn-eye" type="button" (click)="showPass = !showPass">
+              @if (showPass) {
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              } @else {
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              }
+            </button>
+          </div>
+          @if (submitted && errors.password) {
+            <span class="field-error">⚠ {{ errors.password }}</span>
+          }
+          @if (form.password) {
+            <div class="password-strength">
+              <div class="strength-bars">
+                @for (i of BAR_INDICES; track i) {
+                  <div class="strength-bar" [style.background]="isBarActive(i) ? passwordStrengthColor : '#e5e7eb'"></div>
+                }
+              </div>
+              <span class="strength-label" [style.color]="passwordStrengthColor">{{ passwordStrengthLabel }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="field">
+          <label class="field-label">Confirmar contraseña <span class="required">*</span></label>
+          <div class="input-wrap">
+            <input class="form-input" [class.form-input--error]="submitted && errors.confirmPassword"
+              [(ngModel)]="form.confirmPassword" placeholder="Repite la contraseña"
+              [type]="showConfirm ? 'text' : 'password'" />
+            <button class="btn-eye" type="button" (click)="showConfirm = !showConfirm">
+              @if (showConfirm) {
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              } @else {
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              }
+            </button>
+          </div>
+          @if (submitted && errors.confirmPassword) {
+            <span class="field-error">⚠ {{ errors.confirmPassword }}</span>
+          }
+        </div>
+      </div>
+
+      <!-- Rol y equipo -->
+      <div class="drawer-section drawer-section--divided">
+        <div class="section-label">Rol y equipo</div>
+
+        <div class="field">
+          <label class="field-label">Rol <span class="required">*</span></label>
+          <select class="form-input form-select" [class.form-input--error]="submitted && errors.roleId"
+            [(ngModel)]="form.roleId">
+            <option value="">Seleccionar rol</option>
+            @for (r of ROLES; track r.id) {
+              <option [value]="r.id">{{ r.name }}</option>
+            }
+          </select>
+          @if (submitted && errors.roleId) {
+            <span class="field-error">⚠ {{ errors.roleId }}</span>
+          } @else {
+            <span class="field-hint">Define los permisos del usuario en el sistema</span>
+          }
+        </div>
+
+        @if (form.roleId) {
+          <div class="rol-info-card">{{ rolInfo }}</div>
+        }
+
+        <div class="field">
+          <label class="field-label">Equipo <span class="required">*</span></label>
+          <select class="form-input form-select" [class.form-input--error]="submitted && errors.equipoId"
+            [(ngModel)]="form.equipoId">
+            <option value="">Seleccionar equipo</option>
+            @for (e of EQUIPOS; track e.id) {
+              <option [value]="e.id">{{ e.nombre }} ({{ e.tipo }})</option>
+            }
+          </select>
+          @if (submitted && errors.equipoId) {
+            <span class="field-error">⚠ {{ errors.equipoId }}</span>
+          } @else {
+            <span class="field-hint">Jerarquía: ENL → ERLE → ERL</span>
+          }
+        </div>
+      </div>
+
+      <!-- Vista previa -->
+      @if (showPreview) {
+        <div class="preview-card">
+          <div class="avatar avatar--lg" [style.background]="getAvatarColor(form.name || 'U', form.lastname || 'U')">
+            {{ getAvatarInitials(form.name || 'U', form.lastname || 'U') }}
+          </div>
+          <div class="preview-info">
+            <div class="preview-name">{{ form.name }} {{ form.lastname }}</div>
+            <div class="preview-email">{{ form.email || '—' }}</div>
+          </div>
+          @if (previewRoleName) {
+            <span class="role-badge" [ngStyle]="getRoleBadgeStyle(previewRoleName)">{{ previewRoleName }}</span>
+          }
+        </div>
+      }
+
+    </div>
+
+    <!-- Footer -->
+    <div class="drawer-footer">
+      <button class="btn-cancel" (click)="closeDrawer()" type="button">Cancelar</button>
+      <button class="btn-submit" (click)="handleSubmit()" [disabled]="loading" type="button">
+        @if (loading) {
+          <span class="spinner-sm"></span>
+          Creando...
+        } @else {
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Crear usuario
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- Confirm modal -->
+  @if (confirmTarget) {
+    <div class="modal-overlay" (click)="closeConfirm()">
+      <div class="modal" (click)="$event.stopPropagation()">
+
+        <div class="modal-body">
+          <div class="modal-icon"
+            [class.modal-icon--danger]="confirmTarget.action === 'inactivate'"
+            [class.modal-icon--success]="confirmTarget.action === 'reactivate'">
+            @if (confirmTarget.action === 'inactivate') {
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+              </svg>
+            } @else {
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            }
+          </div>
+          <div>
+            <div class="modal-title">
+              {{ confirmTarget.action === 'inactivate' ? '¿Inactivar este usuario?' : '¿Reactivar este usuario?' }}
+            </div>
+            <div class="modal-desc">
+              @if (confirmTarget.action === 'inactivate') {
+                El usuario <strong>{{ confirmTarget.user.name }} {{ confirmTarget.user.lastname }}</strong>
+                no podrá iniciar sesión ni realizar acciones en el sistema.
+                Sus registros históricos se conservarán intactos.
+              } @else {
+                El usuario <strong>{{ confirmTarget.user.name }} {{ confirmTarget.user.lastname }}</strong>
+                recuperará el acceso al sistema con su rol y equipo actuales.
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-user-info">
+          <div class="avatar avatar--sm" [style.background]="getAvatarColor(confirmTarget.user.name, confirmTarget.user.lastname)">
+            {{ getAvatarInitials(confirmTarget.user.name, confirmTarget.user.lastname) }}
+          </div>
+          <div>
+            <div class="modal-user-name">{{ confirmTarget.user.name }} {{ confirmTarget.user.lastname }}</div>
+            <div class="modal-user-email">{{ confirmTarget.user.email }}</div>
+          </div>
+          <span class="role-badge" [ngStyle]="getRoleBadgeStyle(confirmTarget.user.rol)">{{ confirmTarget.user.rol }}</span>
+        </div>
+
+        <div class="modal-footer">
+          <code class="modal-endpoint">PATCH /api/v1/usuarios/{{ confirmTarget.user.id }}/estado</code>
+          <div class="modal-actions">
+            <button class="btn-cancel" (click)="closeConfirm()" type="button">Cancelar</button>
+            <button class="btn-confirm"
+              [class.btn-confirm--danger]="confirmTarget.action === 'inactivate'"
+              [class.btn-confirm--success]="confirmTarget.action === 'reactivate'"
+              (click)="handleConfirm()" [disabled]="confirmLoading" type="button">
+              @if (confirmLoading) {
+                <span class="spinner-sm"></span>
+                Procesando...
+              } @else if (confirmTarget.action === 'inactivate') {
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                </svg>
+                Sí, inactivar
+              } @else {
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Sí, reactivar
+              }
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  }
+
+  <!-- Toast -->
+  @if (toast) {
+    <div class="toast" [class.toast--success]="toast.variant === 'success'" [class.toast--danger]="toast.variant === 'danger'">
+      <div class="toast-icon">
+        @if (toast.variant === 'success') {
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        } @else {
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+          </svg>
+        }
+      </div>
+      {{ toast.msg }}
+    </div>
+  }
+
+</div>
