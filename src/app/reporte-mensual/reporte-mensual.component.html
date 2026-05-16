@@ -1,0 +1,409 @@
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+
+    <!-- ── Result screen ── -->
+    @if (result) {
+      <div class="result-screen">
+        <div class="result-card">
+          <div class="result-icon">✅</div>
+          <div>
+            <div class="result-title">Reporte registrado</div>
+            <div class="result-message">
+              Reporte de <strong>{{ result.mesNombre }} {{ result.anio }}</strong> creado en estado
+              <strong class="result-estado">{{ result.estado }}</strong>.
+            </div>
+          </div>
+          <div class="result-boxes">
+            <div class="result-box result-box--id">
+              <div class="result-box__label">ID</div>
+              <div class="result-box__value">#{{ result.id }}</div>
+            </div>
+            <div class="result-box result-box--period">
+              <div class="result-box__label">Período · Total</div>
+              <div class="result-box__period">{{ result.mesNombre }} {{ result.anio }} · {{ cop(result.total) }}</div>
+            </div>
+          </div>
+          <button class="btn-primary result-btn" (click)="reset()" type="button">Crear otro reporte</button>
+        </div>
+      </div>
+
+    } @else {
+      <!-- ── Topbar ── -->
+      <header class="topbar">
+        <div>
+          <div class="topbar-heading">Reporte de gastos</div>
+          <div class="topbar-sub">
+            <code class="endpoint-badge">POST /api/v1/reportes</code>
+            <span class="topbar-note">· El <code>equipoId</code> se toma del JWT</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ── Content ── -->
+      <div class="content">
+        <div class="content-inner">
+
+          <!-- ═══════════ COLUMNA IZQUIERDA ═══════════ -->
+          <div class="form-col">
+
+            <!-- Banner contextual del rol -->
+            <div class="rol-banner" [class.rol-banner--erl]="isErl">
+              <div class="rol-banner__icon">ⓘ</div>
+              <div>
+                @if (rolNivel === 'ERL') {
+                  <div class="rol-banner__title">Tu rol: ERL — Reportes de entrenamiento</div>
+                  <div class="rol-banner__desc">
+                    Como equipo ERL, solo puedes reportar gastos de la familia <strong>E (Entrenamiento)</strong>.
+                    
+                  </div>
+                } @else if (rolNivel === 'ERLE') {
+                  <div class="rol-banner__title">Tu rol: ERLE — Reporte regional completo</div>
+                  <div class="rol-banner__desc">
+                    Como ERLE, reportas en las 3 familias: <strong>Entrenamiento</strong>, <strong>Mentoría</strong> y <strong>Otros</strong>.
+                    Tu reporte se valida contra los saldos de tu clúster.
+                  </div>
+                } @else {
+                  <div class="rol-banner__title">Tu rol: ENL — Reporte nacional</div>
+                  <div class="rol-banner__desc">
+                    Como Equipo Nacional, reportas en las 3 familias y tu aprobación es la final del flujo.
+                    Tu reporte se valida contra el presupuesto nacional consolidado.
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Período -->
+            <div class="form-card">
+              <div class="card-label">Período del reporte</div>
+              <div class="periodo-grid">
+                <div class="field">
+                  <label class="field-label" for="temporadaId">Temporada</label>
+                  <select
+                    id="temporadaId"
+                    class="form-input form-select"
+                    [(ngModel)]="periodo.temporadaId"
+                    name="temporadaId"
+                    [disabled]="temporadasLoading">
+                    <option value="">{{ temporadasLoading ? 'Cargando…' : 'Seleccionar' }}</option>
+                    @for (t of temporadas; track t.id) {
+                      <option [value]="t.id">{{ t.nombre }}{{ t.esActual ? ' (actual)' : '' }}</option>
+                    }
+                  </select>
+                  @if (temporadasError) {
+                    <span class="field-error">⚠ {{ temporadasError }}</span>
+                  }
+                </div>
+                <div class="field">
+                  <label class="field-label" for="mes">Mes</label>
+                  <select
+                    id="mes"
+                    class="form-input form-select"
+                    [(ngModel)]="periodo.mes"
+                    name="mes">
+                    @for (m of MESES; track $index) {
+                      <option [value]="$index + 1">{{ m }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="field">
+                  <label class="field-label" for="anio">Año</label>
+                  <input
+                    id="anio"
+                    class="form-input"
+                    [(ngModel)]="periodo.anio"
+                    name="anio"
+                    type="number"
+                    min="2020"
+                    max="2099"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Familia E ── -->
+            @for (familia of FAMILIAS; track familia) {
+              <div class="familia-section" [class.familia-section--locked]="isFamiliaLocked(familia)">
+
+                <!-- Header -->
+                <div class="familia-header" [ngClass]="'familia-header--' + (isFamiliaLocked(familia) ? 'locked' : familia)">
+                  <div class="familia-header__left">
+                    <span class="familia-header__icon">
+                      {{ isFamiliaLocked(familia) ? '🔒' : FAMILIA_INFO[familia].icon }}
+                    </span>
+                    <div>
+                      <div class="familia-header__name" [ngClass]="isFamiliaLocked(familia) ? 'familia-header__name--locked' : 'familia-header__name--' + familia">
+                        {{ FAMILIA_INFO[familia].label }}
+                      </div>
+                      <div class="familia-header__meta" [ngClass]="isFamiliaLocked(familia) ? 'familia-header__meta--locked' : 'familia-header__meta--' + familia">
+                        Familia {{ familia }} · {{ categoriasByFamilia(familia).length }} categorías
+                        · <em>bucket: {{ FAMILIA_INFO[familia].bucket }}</em>
+                      </div>
+                    </div>
+                  </div>
+                  @if (isFamiliaLocked(familia)) {
+                    <span class="familia-locked-badge">Bloqueado</span>
+                  } @else if (totalByFamilia(familia) > 0) {
+                    <span class="familia-subtotal" [ngClass]="'familia-subtotal--' + familia">
+                      {{ cop(totalByFamilia(familia)) }}
+                    </span>
+                  }
+                </div>
+
+                <!-- Lock reason -->
+                @if (isFamiliaLocked(familia) && $any(LOCK_REASONS)[familia]) {
+                  <div class="familia-lock-reason">
+                    <span class="familia-lock-reason__icon">ⓘ</span>
+                    {{ $any(LOCK_REASONS)[familia] }}
+                  </div>
+                }
+
+                <!-- Rubros activos -->
+                @if (!isFamiliaLocked(familia)) {
+                  @for (cat of categoriasByFamilia(familia); track cat.codigo; let last = $last) {
+                    <div class="rubro-row" [class.rubro-row--last]="last" [class.rubro-row--filled]="getMontoNum(cat.codigo) > 0">
+                      <div class="rubro-row__icon-wrap" [ngClass]="'rubro-row__icon-wrap--' + cat.familia">
+                        {{ cat.icon }}
+                      </div>
+                      <div class="rubro-row__info">
+                        <div class="rubro-row__name">{{ cat.nombre }}</div>
+                        <div class="rubro-row__badges">
+                          <code class="rubro-code" [ngClass]="'rubro-code--' + cat.familia">{{ cat.codigo }}</code>
+                          <span class="rubro-familia">Familia {{ cat.familia }}</span>
+                        </div>
+                      </div>
+                      <div class="rubro-row__input-wrap">
+                        <span class="rubro-row__prefix">$</span>
+                        <input
+                          class="rubro-input"
+                          [class.rubro-input--filled]="getMontoNum(cat.codigo) > 0"
+                          [(ngModel)]="montos[cat.codigo]"
+                          [name]="cat.codigo"
+                          type="number"
+                          min="0"
+                          step="100"
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                  }
+                }
+
+                <!-- Rubros bloqueados (greyed list) -->
+                @if (isFamiliaLocked(familia)) {
+                  <div class="familia-locked-list">
+                    @for (cat of categoriasByFamilia(familia); track cat.codigo) {
+                      <div class="familia-locked-row">
+                        <span class="familia-locked-row__icon">{{ cat.icon }}</span>
+                        <code class="rubro-code-sm">{{ cat.codigo }}</code>
+                        <span class="familia-locked-row__name">{{ cat.nombre }}</span>
+                      </div>
+                    }
+                  </div>
+                }
+
+              </div>
+            }
+
+            <!-- Soporte de gastos -->
+            
+
+          </div><!-- /form-col -->
+
+          <!-- ═══════════ COLUMNA DERECHA ═══════════ -->
+          <div class="sidebar-col">
+
+            <!-- Techo presupuestal -->
+            <div class="sidebar-section-title">Techo presupuestal</div>
+            <div class="sidebar-note">
+              El backend valida que tus gastos no superen el saldo. Fuente:
+              <code class="inline-code">vista_control_saldos_enl</code>.
+            </div>
+
+            <!-- Saldo Entrenamiento -->
+            <div class="saldo-card" [class.saldo-card--active]="totalE > 0">
+              <div class="saldo-card__header">
+                <div class="saldo-card__label">
+                  <span>📚</span>
+                  <span class="saldo-card__name">Entrenamiento (E)</span>
+                </div>
+              </div>
+              <div class="saldo-card__cols">
+                <div class="saldo-col">
+                  <div class="saldo-col__label">Disponible</div>
+                  <div class="saldo-col__value">
+                    {{ saldosLoading ? '…' : (saldos ? cop(saldos.entrenamiento.disponible) : '—') }}
+                  </div>
+                </div>
+                <div class="saldo-col">
+                  <div class="saldo-col__label">Este reporte</div>
+                  <div class="saldo-col__value saldo-col__value--accent" [class.saldo-col__value--zero]="totalE === 0">
+                    {{ cop(totalE) }}
+                  </div>
+                </div>
+                <div class="saldo-col">
+                  <div class="saldo-col__label">Queda</div>
+                  <div class="saldo-col__value" [class.saldo-col__value--negative]="excedeSaldoE">
+                    {{ saldosLoading ? '…' : (saldos ? cop(saldos.entrenamiento.disponible - totalE) : '—') }}
+                  </div>
+                </div>
+              </div>
+              <div class="saldo-bar-track">
+                <div class="saldo-bar-fill saldo-bar-fill--E" [style.width.%]="saldoBarPct(saldos?.entrenamiento, totalE)"></div>
+              </div>
+            </div>
+
+            <!-- Saldo Mentoría (locked for ERL) -->
+            @if (isErl) {
+              <div class="saldo-card saldo-card--locked">
+                <div class="saldo-locked-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="saldo-locked-name">Mentoría (M)</div>
+                  <div class="saldo-locked-sub">No disponible para este rol</div>
+                </div>
+              </div>
+            } @else {
+              <div class="saldo-card" [class.saldo-card--active]="totalM > 0">
+                <div class="saldo-card__header">
+                  <div class="saldo-card__label">
+                    <span>🤝</span>
+                    <span class="saldo-card__name">Mentoría (M)</span>
+                  </div>
+                </div>
+                <div class="saldo-card__cols">
+                  <div class="saldo-col">
+                    <div class="saldo-col__label">Disponible</div>
+                    <div class="saldo-col__value">
+                      {{ saldosLoading ? '…' : (saldos ? cop(saldos.mentoreo.disponible) : '—') }}
+                    </div>
+                  </div>
+                  <div class="saldo-col">
+                    <div class="saldo-col__label">Este reporte</div>
+                    <div class="saldo-col__value saldo-col__value--accent" [class.saldo-col__value--zero]="totalM === 0">
+                      {{ cop(totalM) }}
+                    </div>
+                  </div>
+                  <div class="saldo-col">
+                    <div class="saldo-col__label">Queda</div>
+                    <div class="saldo-col__value" [class.saldo-col__value--negative]="excedeSaldoM">
+                      {{ saldosLoading ? '…' : (saldos ? cop(saldos.mentoreo.disponible - totalM) : '—') }}
+                    </div>
+                  </div>
+                </div>
+                <div class="saldo-bar-track">
+                  <div class="saldo-bar-fill saldo-bar-fill--M" [style.width.%]="saldoBarPct(saldos?.mentoreo, totalM)"></div>
+                </div>
+              </div>
+            }
+
+            <!-- Saldo Otros (locked for ERL) -->
+            @if (isErl) {
+              <div class="saldo-card saldo-card--locked">
+                <div class="saldo-locked-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="saldo-locked-name">Otros (O)</div>
+                  <div class="saldo-locked-sub">No disponible para este rol</div>
+                </div>
+              </div>
+            } @else {
+            <div class="saldo-card" [class.saldo-card--active]="totalO > 0">
+              <div class="saldo-card__header">
+                <div class="saldo-card__label">
+                  <span>📋</span>
+                  <span class="saldo-card__name">Otros (O)</span>
+                </div>
+              </div>
+              <div class="saldo-card__cols">
+                <div class="saldo-col">
+                  <div class="saldo-col__label">Disponible</div>
+                  <div class="saldo-col__value">—</div>
+                </div>
+                <div class="saldo-col">
+                  <div class="saldo-col__label">Este reporte</div>
+                  <div class="saldo-col__value saldo-col__value--accent" [class.saldo-col__value--zero]="totalO === 0">
+                    {{ cop(totalO) }}
+                  </div>
+                </div>
+                <div class="saldo-col">
+                  <div class="saldo-col__label">Queda</div>
+                  <div class="saldo-col__value">—</div>
+                </div>
+              </div>
+              <div class="saldo-bar-track">
+                <div class="saldo-bar-fill saldo-bar-fill--O" [style.width.%]="totalO > 0 ? 60 : 0"></div>
+              </div>
+            </div>
+            }
+
+            <!-- Resumen -->
+            <div class="resumen-card">
+              <div class="resumen-card__title">Resumen del reporte</div>
+              <div class="resumen-rows">
+                @for (f of FAMILIAS; track f) {
+                  <div class="resumen-row" [class.resumen-row--locked]="isErl && f !== 'E'">
+                    <div class="resumen-row__left">
+                      <span class="resumen-dot" [ngClass]="'resumen-dot--' + f"></span>
+                      <span class="resumen-row__label">{{ FAMILIA_INFO[f].label }}</span>
+                    </div>
+                    <span class="resumen-row__value"
+                      [ngClass]="(isErl && f !== 'E') ? '' : (totalByFamilia(f) > 0 ? 'resumen-row__value--' + f : '')">
+                      {{ (isErl && f !== 'E') ? '—' : cop(totalByFamilia(f)) }}
+                    </span>
+                  </div>
+                }
+                <div class="resumen-total-row">
+                  <span class="resumen-total-label">Total a reportar</span>
+                  <span class="resumen-total-value" [class.resumen-total-value--active]="totalGastado > 0">
+                    {{ cop(totalGastado) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Error -->
+            @if (errorGeneral) {
+              <div class="error-banner">⚠ {{ errorGeneral }}</div>
+            }
+
+            <!-- Submit -->
+            <button
+              class="btn-submit-main"
+              [class.btn-submit-main--disabled]="!hayDetalles || loading || excedeSaldo"
+              [class.btn-submit-main--loading]="loading"
+              [disabled]="!hayDetalles || loading || excedeSaldo"
+              (click)="submit()"
+              type="button">
+              @if (loading) {
+                <span class="spinner-sm"></span> Enviando...
+              } @else if (!hayDetalles) {
+                Ingresa al menos un rubro
+              } @else if (excedeSaldo) {
+                ⚠ Excede el saldo disponible
+              } @else if (soporteFile) {
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                Enviar para revisión
+              } @else {
+                📝 Guardar borrador
+              }
+            </button>
+
+          </div><!-- /sidebar-col -->
+
+        </div><!-- /content-inner -->
+      </div><!-- /content -->
+    }
+
+  </main>
+</div>
