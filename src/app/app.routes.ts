@@ -48,6 +48,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./create-users/create-users')
         .then(m => m.CreateUsers)
+    path: 'reportes/mensual',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./reporte-mensual/reporte-mensual.component')
+        .then(m => m.ReporteMensualComponent)
   },
   {
     path: '',
