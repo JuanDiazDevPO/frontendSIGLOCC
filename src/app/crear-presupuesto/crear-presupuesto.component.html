@@ -1,0 +1,434 @@
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-heading">Ingreso de datos de presupuesto</div>
+      </div>
+      <div class="tab-switcher">
+        <button class="tab-btn" [class.tab-btn--active]="activeTab === 'manual'"
+          (click)="activeTab = 'manual'" type="button">✏️ Manual</button>
+        <button class="tab-btn" [class.tab-btn--active]="activeTab === 'csv'"
+          (click)="activeTab = 'csv'" type="button">📤 Carga CSV</button>
+      </div>
+    </header>
+
+    <!-- ══ MANUAL TAB ══ -->
+    @if (activeTab === 'manual') {
+
+      @if (result) {
+        <!-- Success screen -->
+        <div class="success-screen">
+          <div class="success-card">
+            <div class="success-icon">📊</div>
+            <div class="success-title">Presupuesto registrado</div>
+            <div class="success-desc">
+              Presupuesto registrado correctamente para el equipo
+              <strong>{{ result.equipoNombre }}</strong> en la temporada
+              <strong>{{ result.temporadaNombre }}</strong>.
+            </div>
+            <div class="success-id-box">
+              <div>
+                <div class="success-id-label">ID del registro</div>
+                <div class="success-id-value">#{{ result.id }}</div>
+              </div>
+              <span class="success-checkmark">✅</span>
+            </div>
+            <button class="btn-primary" (click)="reset()" type="button">Registrar otro</button>
+          </div>
+        </div>
+
+      } @else {
+        <div class="content-area">
+
+          <!-- Form panel -->
+          <div class="form-panel">
+
+            <!-- Prerequisite banner -->
+            <div class="prereq-banner">
+              <span class="prereq-icon">⚠️</span>
+              <div class="prereq-text">
+                <strong>Prerequisito:</strong> Los parámetros ENL de la temporada deben estar
+                configurados. El equipo debe tener meta asignada en
+                <code class="inline-code">metas_equipo</code>.
+              </div>
+            </div>
+
+            <!-- ── Sección 1: Configuración base ── -->
+            <div class="form-section">
+              <div class="section-header">
+                <div class="section-header__icon">⚙️</div>
+                <div>
+                  <div class="section-header__title">Configuración base</div>
+                  <div class="section-header__sub">Equipo y temporada a la que aplica este presupuesto</div>
+                </div>
+              </div>
+              <div class="grid-2">
+                <div class="field">
+                  <label class="field-label" for="equipoId">Equipo <span class="required">*</span></label>
+                  <select
+                    id="equipoId"
+                    class="form-input form-select"
+                    [class.form-input--error]="err('equipoId')"
+                    [(ngModel)]="form.equipoId"
+                    name="equipoId"
+                    [disabled]="equiposLoading">
+                    <option value="">{{ equiposLoading ? 'Cargando equipos…' : 'Seleccionar equipo' }}</option>
+                    @for (e of equipos; track e.id) {
+                      <option [value]="e.id">{{ e.nombre }} ({{ e.tipo }})</option>
+                    }
+                  </select>
+                  @if (equiposError) {
+                    <span class="field-error">⚠ {{ equiposError }}</span>
+                  } @else if (err('equipoId')) {
+                    <span class="field-error">⚠ {{ err('equipoId') }}</span>
+                  }
+                </div>
+                <div class="field">
+                  <label class="field-label" for="temporadaId">Temporada <span class="required">*</span></label>
+                  <select
+                    id="temporadaId"
+                    class="form-input form-select"
+                    [class.form-input--error]="err('temporadaId')"
+                    [(ngModel)]="form.temporadaId"
+                    name="temporadaId"
+                    [disabled]="temporadasLoading">
+                    <option value="">{{ temporadasLoading ? 'Cargando temporadas…' : 'Seleccionar temporada' }}</option>
+                    @for (t of temporadas; track t.id) {
+                      <option [value]="t.id">{{ t.nombre }}{{ t.esActual ? ' (actual)' : '' }}</option>
+                    }
+                  </select>
+                  @if (temporadasError) {
+                    <span class="field-error">⚠ {{ temporadasError }}</span>
+                  } @else if (err('temporadaId')) {
+                    <span class="field-error">⚠ {{ err('temporadaId') }}</span>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Sección 2: Presentaciones de Visión ── -->
+            <div class="form-section form-section--divided">
+              <div class="section-header">
+                <div class="section-header__icon">👁️</div>
+                <div>
+                  <div class="section-header__title">Presentaciones de Visión (PV)</div>
+                  <div class="section-header__sub">Planificación de eventos de visión con pastores e invitados</div>
+                </div>
+              </div>
+              <div class="grid-4">
+                <div class="field">
+                  <label class="field-label" for="numPv">
+                    Nº de PV <span class="required">*</span>
+                    <span class="tooltip" title="Número de Presentaciones de Visión planificadas">ⓘ</span>
+                  </label>
+                  <input id="numPv" class="form-input" [class.form-input--error]="err('numPv')"
+                    [(ngModel)]="form.numPv" name="numPv" type="number" min="0" placeholder="Ej: 100" />
+                  @if (err('numPv')) { <span class="field-error">⚠ {{ err('numPv') }}</span> }
+                </div>
+                <div class="field">
+                  <label class="field-label" for="entrenadoresPv">
+                    Entrenadores / PV <span class="required">*</span>
+                    <span class="tooltip" title="Entrenadores (staff) por cada presentación">ⓘ</span>
+                  </label>
+                  <input id="entrenadoresPv" class="form-input" [class.form-input--error]="err('entrenadoresPv')"
+                    [(ngModel)]="form.entrenadoresPv" name="entrenadoresPv" type="number" min="0" placeholder="Ej: 2" />
+                  @if (err('entrenadoresPv')) { <span class="field-error">⚠ {{ err('entrenadoresPv') }}</span> }
+                </div>
+                <div class="field">
+                  <label class="field-label" for="personasPv">
+                    Personas invitadas / PV <span class="required">*</span>
+                    <span class="tooltip" title="Personas invitadas por presentación">ⓘ</span>
+                  </label>
+                  <input id="personasPv" class="form-input" [class.form-input--error]="err('personasPv')"
+                    [(ngModel)]="form.personasPv" name="personasPv" type="number" min="0" placeholder="Ej: 3" />
+                  @if (err('personasPv')) { <span class="field-error">⚠ {{ err('personasPv') }}</span> }
+                </div>
+                <div class="field">
+                  <label class="field-label" for="promedioCmCont">
+                    Promedio CM / Contenedor <span class="required">*</span>
+                    <span class="tooltip" title="Promedio de cajas por Punto de Venta o Contenedor. Base para calcular LGA.">ⓘ</span>
+                  </label>
+                  <input id="promedioCmCont" class="form-input" [class.form-input--error]="err('promedioCmCont')"
+                    [(ngModel)]="form.promedioCmCont" name="promedioCmCont" type="number" min="0" placeholder="Ej: 49.5" />
+                  @if (err('promedioCmCont')) { <span class="field-error">⚠ {{ err('promedioCmCont') }}</span> }
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Sección 3: Capacitación OCC ── -->
+            <div class="form-section form-section--divided">
+              <div class="section-header">
+                <div class="section-header__icon">📚</div>
+                <div>
+                  <div class="section-header__title">Capacitación OCC</div>
+                  <div class="section-header__sub">Eventos de capacitación y número de maestros LGA</div>
+                </div>
+              </div>
+              <div class="grid-3">
+                <div class="field">
+                  <label class="field-label" for="numCapOcc">
+                    Nº de Capacitaciones OCC <span class="required">*</span>
+                    <span class="tooltip" title="Capacitaciones OCC planificadas en la temporada">ⓘ</span>
+                  </label>
+                  <input id="numCapOcc" class="form-input" [class.form-input--error]="err('numCapOcc')"
+                    [(ngModel)]="form.numCapOcc" name="numCapOcc" type="number" min="0" placeholder="Ej: 3" />
+                  @if (err('numCapOcc')) { <span class="field-error">⚠ {{ err('numCapOcc') }}</span> }
+                </div>
+                <div class="field">
+                  <label class="field-label" for="numEntrenadoresCap">
+                    Entrenadores / Capacitación <span class="required">*</span>
+                    <span class="tooltip" title="Entrenadores asignados por cada Capacitación OCC">ⓘ</span>
+                  </label>
+                  <input id="numEntrenadoresCap" class="form-input" [class.form-input--error]="err('numEntrenadoresCap')"
+                    [(ngModel)]="form.numEntrenadoresCap" name="numEntrenadoresCap" type="number" min="0" placeholder="Ej: 12" />
+                  @if (err('numEntrenadoresCap')) { <span class="field-error">⚠ {{ err('numEntrenadoresCap') }}</span> }
+                </div>
+                <div class="field">
+                  <label class="field-label" for="maestrosLga">
+                    Maestros LGA <span class="required">*</span>
+                    <span class="tooltip" title="Número de maestros LGA. Ingreso manual, no se calcula automáticamente.">ⓘ</span>
+                  </label>
+                  <input id="maestrosLga" class="form-input" [class.form-input--error]="err('maestrosLga')"
+                    [(ngModel)]="form.maestrosLga" name="maestrosLga" type="number" min="0" placeholder="Ej: 384" />
+                  @if (err('maestrosLga')) { <span class="field-error">⚠ {{ err('maestrosLga') }}</span> }
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Sección 4: Mentoría y Oración (solo ENL_RECURSOS) ── -->
+            @if (isEnlRecursos) {
+            <div class="form-section form-section--divided">
+              <div class="section-header">
+                <div class="section-header__icon">🤝</div>
+                <div>
+                  <div class="section-header__title">Mentoría y Oración</div>
+                  <div class="section-header__sub">Equipos bajo mentoría directa y presupuesto de oración</div>
+                </div>
+              </div>
+              <div class="grid-2">
+                <div class="field">
+                  <label class="field-label" for="equiposBajoMentoreo">
+                    Equipos bajo mentoría <span class="required">*</span>
+                    <span class="tooltip" title="Multiplicador clave: equiposBajoMentoreo × visitas × personas">ⓘ</span>
+                  </label>
+                  <input id="equiposBajoMentoreo" class="form-input" [class.form-input--error]="err('equiposBajoMentoreo')"
+                    [(ngModel)]="form.equiposBajoMentoreo" name="equiposBajoMentoreo" type="number" min="0" placeholder="Ej: 3" />
+                  @if (err('equiposBajoMentoreo')) { <span class="field-error">⚠ {{ err('equiposBajoMentoreo') }}</span> }
+                </div>
+                <div class="field">
+                  <label class="field-label" for="montoOracionCop">
+                    Monto de Oración (COP) <span class="required">*</span>
+                    <span class="tooltip" title="Monto destinado a oración, en pesos colombianos.">ⓘ</span>
+                  </label>
+                  <div class="monto-wrap">
+                    <span class="monto-prefix">$</span>
+                    <input id="montoOracionCop" class="form-input form-input--monto" [class.form-input--error]="err('montoOracionCop')"
+                      [(ngModel)]="form.montoOracionCop" name="montoOracionCop" type="number" min="0" placeholder="50000" />
+                  </div>
+                  @if (err('montoOracionCop')) {
+                    <span class="field-error">⚠ {{ err('montoOracionCop') }}</span>
+                  } @else if (form.montoOracionCop) {
+                    <span class="field-hint">$ {{ montoOracionFormatted }} COP</span>
+                  }
+                </div>
+              </div>
+            </div>
+            } <!-- /isEnlRecursos -->
+
+            <!-- Error general -->
+            @if (errorGeneral) {
+              <div class="error-banner">⚠ {{ errorGeneral }}</div>
+            }
+
+            <!-- Progress + Submit -->
+            <div class="submit-row">
+              <div class="form-progress">
+                <div class="form-progress__header">
+                  <span class="form-progress__label">Completado</span>
+                  <span class="form-progress__count">{{ jsonFieldsFilled }}/{{ jsonFieldsTotal }} campos</span>
+                </div>
+                <div class="form-progress__track">
+                  <div class="form-progress__bar" [style.width.%]="jsonProgressPct"></div>
+                </div>
+              </div>
+              <button class="btn-submit" [class.btn-submit--loading]="loading"
+                [disabled]="loading" (click)="submit()" type="button">
+                @if (loading) {
+                  <span class="spinner-sm"></span> Registrando…
+                } @else {
+                  📊 Registrar presupuesto
+                }
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+      }
+    }
+
+    <!-- ══ CSV TAB ══ -->
+    @if (activeTab === 'csv') {
+      <div class="content-area content-area--csv">
+
+        <!-- CSV main column -->
+        <div class="csv-main">
+
+          <!-- Prerequisite banner -->
+          <div class="prereq-banner">
+            <span class="prereq-icon">⚠️</span>
+            <div class="prereq-text">
+              <strong>Prerequisito:</strong> El ENL debe haber configurado los parámetros de
+              temporada antes de cargar presupuestos.
+            </div>
+          </div>
+
+          @if (!csvResult) {
+            <!-- Drop zone -->
+            <div class="drop-zone"
+              [class.drop-zone--drag]="csvDrag"
+              [class.drop-zone--file]="csvFile"
+              (dragover)="onCsvDragOver($event)"
+              (dragleave)="onCsvDragLeave()"
+              (drop)="onCsvDrop($event)"
+              (click)="!csvFile && csvInput.click()">
+              <input #csvInput type="file" accept=".csv" class="csv-file-input"
+                (change)="onCsvFileInput($event)" />
+
+              @if (csvFile) {
+                <div class="drop-zone__file">
+                  <div class="drop-zone__file-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                  </div>
+                  <div class="drop-zone__file-name">{{ csvFile.name }}</div>
+                  <div class="drop-zone__file-size">{{ csvFileSizeKb }} KB</div>
+                  <button class="btn-change-file" type="button" (click)="clearCsvFile($event)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                    Cambiar archivo
+                  </button>
+                </div>
+              } @else {
+                <div class="drop-zone__empty">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+                    <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+                  </svg>
+                  <div class="drop-zone__title">Arrastra tu archivo CSV aquí</div>
+                  <div class="drop-zone__sub">o haz clic para seleccionar</div>
+                  <span class="drop-zone__badge">Solo archivos .csv</span>
+                </div>
+              }
+            </div>
+
+            <!-- Upload button -->
+            @if (csvFile) {
+              <button class="btn-upload" [class.btn-upload--loading]="csvLoading"
+                [disabled]="csvLoading" (click)="submitCsv()" type="button">
+                @if (csvLoading) {
+                  <span class="spinner-sm"></span> Procesando CSV…
+                } @else {
+                  📤 Subir y procesar archivo
+                }
+              </button>
+            }
+          }
+
+          <!-- CSV Result -->
+          @if (csvResult) {
+            <div class="csv-result">
+              <div class="csv-result__header" [class.csv-result__header--ok]="csvResult.fallidos === 0">
+                <span class="csv-result__emoji">{{ csvResult.fallidos === 0 ? '✅' : '⚠️' }}</span>
+                <div>
+                  <div class="csv-result__title">
+                    {{ csvResult.fallidos === 0 ? 'Carga completada exitosamente' : 'Carga completada con errores' }}
+                  </div>
+                  <div class="csv-result__filename">{{ csvFile?.name }}</div>
+                </div>
+              </div>
+              <div class="csv-result__stats">
+                <div class="csv-stat">
+                  <div class="csv-stat__value">{{ csvResult.procesados }}</div>
+                  <div class="csv-stat__label">Procesadas</div>
+                </div>
+                <div class="csv-stat csv-stat--ok">
+                  <div class="csv-stat__value csv-stat__value--ok">{{ csvResult.exitosos }}</div>
+                  <div class="csv-stat__label">Exitosas</div>
+                </div>
+                <div class="csv-stat">
+                  <div class="csv-stat__value" [class.csv-stat__value--err]="csvResult.fallidos > 0">{{ csvResult.fallidos }}</div>
+                  <div class="csv-stat__label">Fallidas</div>
+                </div>
+              </div>
+              @if (csvResult.errores.length > 0) {
+                <div class="csv-result__errors">
+                  <div class="csv-result__errors-title">Detalle de errores</div>
+                  @for (e of csvResult.errores; track e) {
+                    <div class="csv-error-row">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                      </svg>
+                      <code>{{ e }}</code>
+                    </div>
+                  }
+                </div>
+              }
+              <div class="csv-result__footer">
+                <button class="btn-outline" (click)="resetCsv()" type="button">Nueva carga</button>
+              </div>
+            </div>
+          }
+
+          <!-- Format reference -->
+          <div class="csv-format-card">
+            <div class="csv-format-card__header">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              <span>Formato del CSV</span>
+            </div>
+            <div class="csv-format-card__body">
+              <div class="csv-format-label">Encabezado (fila 1)</div>
+              <div class="code-dark">{{ CSV_FORMAT }}</div>
+              <div class="csv-format-label" style="margin-top: 14px;">Ejemplo de datos</div>
+              <pre class="code-dark">{{ CSV_EXAMPLE }}</pre>
+              <p class="csv-format-note">
+                ⚙️ El proceso <strong>nunca se detiene</strong> por errores individuales:
+                procesa todas las filas y reporta los fallos al final.
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- CSV columns reference panel -->
+        <div class="csv-cols-panel">
+          <div class="csv-cols-panel__title">Columnas del CSV</div>
+          <div class="csv-cols-list">
+            @for (col of CSV_COLUMNS; track col.col; let last = $last) {
+              <div class="csv-col-row" [class.csv-col-row--last]="last">
+                <div class="csv-col-row__info">
+                  <code class="csv-col-name">{{ col.col }}</code>
+                  <div class="csv-col-desc">{{ col.desc }}</div>
+                </div>
+                <span class="csv-col-type">{{ col.tipo }}</span>
+              </div>
+            }
+          </div>
+          
+        </div>
+
+      </div>
+    }
+
+  </main>
+</div>
