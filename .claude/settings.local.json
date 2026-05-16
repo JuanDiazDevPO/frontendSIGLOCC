@@ -7,7 +7,16 @@
       "Bash(python -c ' *)",
       "Bash(npx tsc *)",
       "Bash(gunzip -c \"/Users/juan/.claude/projects/-Users-juan-learningProjects-frontendSIGLOCC/2c90a2dd-b12b-43d3-97d0-7dd62c35eb8d/tool-results/webfetch-1778952708762-biyz1t.bin\")",
-      "Bash(tar -x -O \"siglocc/project/Crear Presupuesto.html\")"
+      "Bash(tar -x -O \"siglocc/project/Crear Presupuesto.html\")",
+      "Bash(mkdir -p /Users/juan/learningProjects/frontendSIGLOCC/src/app/reporte-mensual)",
+      "Bash(cp \"/Users/juan/.claude/projects/-Users-juan-learningProjects-frontendSIGLOCC/5b000d9f-7c6f-4317-a0ae-9cc752be4e72/tool-results/webfetch-1778956291049-1vfnrx.bin\" /tmp/design.gz)",
+      "Bash(gunzip -f /tmp/design.gz)",
+      "Read(//tmp/**)",
+      "Read(//private/tmp/**)",
+      "Bash(tar tf *)"
+    ],
+    "additionalDirectories": [
+      "/Users/juan/learningProjects/frontendSIGLOCC/src/app"
     ]
   }
 }

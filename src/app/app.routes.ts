@@ -43,6 +43,13 @@ export const routes: Routes = [
         .then(m => m.CrearPresupuestoComponent)
   },
   {
+    path: 'reportes/mensual',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./reporte-mensual/reporte-mensual.component')
+        .then(m => m.ReporteMensualComponent)
+  },
+  {
     path: '',
     redirectTo: 'login',
     pathMatch: 'full'
