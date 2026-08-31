@@ -30,7 +30,8 @@
           <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <input class="search-input" [(ngModel)]="search" placeholder="Buscar por nombre, correo, rol…" type="text" />
+          <label class="sr-only" for="user-search">Buscar usuarios</label>
+          <input id="user-search" class="search-input" [(ngModel)]="search" placeholder="Buscar por nombre, correo, rol…" type="text" />
         </div>
 
         <div class="filter-tabs">
@@ -142,7 +143,9 @@
   </main>
 
   <!-- Drawer overlay -->
-  <div class="overlay" [class.overlay--open]="drawerOpen" (click)="closeDrawer()"></div>
+  <div class="overlay" [class.overlay--open]="drawerOpen" role="button" tabindex="0"
+    (click)="closeDrawer()" (keydown.enter)="closeDrawer()" (keydown.escape)="closeDrawer()"
+    aria-label="Cerrar panel"></div>
 
   <!-- Drawer panel -->
   <div class="drawer" [class.drawer--open]="drawerOpen">
@@ -168,16 +171,16 @@
         <div class="section-label">Información personal</div>
         <div class="grid-2">
           <div class="field">
-            <label class="field-label">Nombre <span class="required">*</span></label>
-            <input class="form-input" [class.form-input--error]="submitted && errors.name"
+            <label class="field-label" for="user-name">Nombre <span class="required">*</span></label>
+            <input id="user-name" class="form-input" [class.form-input--error]="submitted && errors.name"
               [(ngModel)]="form.name" placeholder="Ej: Andrea" type="text" />
             @if (submitted && errors.name) {
               <span class="field-error">⚠ {{ errors.name }}</span>
             }
           </div>
           <div class="field">
-            <label class="field-label">Apellido <span class="required">*</span></label>
-            <input class="form-input" [class.form-input--error]="submitted && errors.lastname"
+            <label class="field-label" for="user-lastname">Apellido <span class="required">*</span></label>
+            <input id="user-lastname" class="form-input" [class.form-input--error]="submitted && errors.lastname"
               [(ngModel)]="form.lastname" placeholder="Ej: Morales" type="text" />
             @if (submitted && errors.lastname) {
               <span class="field-error">⚠ {{ errors.lastname }}</span>
@@ -191,8 +194,8 @@
         <div class="section-label">Credenciales de acceso</div>
 
         <div class="field">
-          <label class="field-label">Correo electrónico <span class="required">*</span></label>
-          <input class="form-input" [class.form-input--error]="submitted && errors.email"
+          <label class="field-label" for="user-email">Correo electrónico <span class="required">*</span></label>
+          <input id="user-email" class="form-input" [class.form-input--error]="submitted && errors.email"
             [(ngModel)]="form.email" placeholder="usuario@occ.org" type="email" />
           @if (submitted && errors.email) {
             <span class="field-error">⚠ {{ errors.email }}</span>
@@ -202,9 +205,9 @@
         </div>
 
         <div class="field">
-          <label class="field-label">Contraseña <span class="required">*</span></label>
+          <label class="field-label" for="user-password">Contraseña <span class="required">*</span></label>
           <div class="input-wrap">
-            <input class="form-input" [class.form-input--error]="submitted && errors.password"
+            <input id="user-password" class="form-input" [class.form-input--error]="submitted && errors.password"
               [(ngModel)]="form.password" placeholder="Mínimo 8 caracteres"
               [type]="showPass ? 'text' : 'password'" />
             <button class="btn-eye" type="button" (click)="showPass = !showPass">
@@ -238,9 +241,9 @@
         </div>
 
         <div class="field">
-          <label class="field-label">Confirmar contraseña <span class="required">*</span></label>
+          <label class="field-label" for="user-confirm-password">Confirmar contraseña <span class="required">*</span></label>
           <div class="input-wrap">
-            <input class="form-input" [class.form-input--error]="submitted && errors.confirmPassword"
+            <input id="user-confirm-password" class="form-input" [class.form-input--error]="submitted && errors.confirmPassword"
               [(ngModel)]="form.confirmPassword" placeholder="Repite la contraseña"
               [type]="showConfirm ? 'text' : 'password'" />
             <button class="btn-eye" type="button" (click)="showConfirm = !showConfirm">
@@ -269,8 +272,8 @@
         <div class="section-label">Rol y equipo</div>
 
         <div class="field">
-          <label class="field-label">Rol <span class="required">*</span></label>
-          <select class="form-input form-select" [class.form-input--error]="submitted && errors.roleId"
+          <label class="field-label" for="user-role">Rol <span class="required">*</span></label>
+          <select id="user-role" class="form-input form-select" [class.form-input--error]="submitted && errors.roleId"
             [(ngModel)]="form.roleId" [disabled]="rolesLoading || !!rolesError">
             <option value="">{{ rolesLoading ? 'Cargando roles…' : 'Seleccionar rol' }}</option>
             @for (r of ROLES; track r.id) {
@@ -291,8 +294,8 @@
         }
 
         <div class="field">
-          <label class="field-label">Equipo <span class="required">*</span></label>
-          <select class="form-input form-select" [class.form-input--error]="submitted && errors.equipoId"
+          <label class="field-label" for="user-equipo">Equipo <span class="required">*</span></label>
+          <select id="user-equipo" class="form-input form-select" [class.form-input--error]="submitted && errors.equipoId"
             [(ngModel)]="form.equipoId" [disabled]="equiposLoading || !!equiposError">
             <option value="">{{ equiposLoading ? 'Cargando equipos…' : 'Seleccionar equipo' }}</option>
             @for (e of EQUIPOS; track e.id) {
@@ -346,8 +349,10 @@
 
   <!-- Confirm modal -->
   @if (confirmTarget) {
-    <div class="modal-overlay" (click)="closeConfirm()">
-      <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-overlay" role="button" tabindex="0" aria-label="Cerrar diálogo"
+      (click)="$event.target === $event.currentTarget && closeConfirm()"
+      (keydown.enter)="closeConfirm()" (keydown.escape)="closeConfirm()">
+      <div class="modal" role="dialog" aria-modal="true">
 
         <div class="modal-body">
           <div class="modal-icon"

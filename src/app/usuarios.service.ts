@@ -7,9 +7,9 @@ import { CrearUsuarioRequest, Equipo, Rol } from './usuarios.models';
   providedIn: 'root'
 })
 export class UsuariosService {
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
 
-  private API = `${environment.apiUrl}/usuarios`;
+  private readonly API = `${environment.apiUrl}/usuarios`;
 
   crearUsuario(data: CrearUsuarioRequest) {
     return this.http.post<unknown>(this.API, data, { observe: 'response' });

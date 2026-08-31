@@ -192,6 +192,14 @@ export class CreateUsers implements OnInit {
 
   closeDrawer() { this.drawerOpen = false; }
 
+  private isValidEmail(email: string): boolean {
+    const atIndex = email.indexOf('@');
+    if (atIndex <= 0 || atIndex === email.length - 1) return false;
+    if (email.indexOf('@', atIndex + 1) !== -1) return false;
+    if (/\s/.test(email)) return false;
+    return email.includes('.', atIndex + 1);
+  }
+
   validate(): boolean {
     const f = this.form;
     const e: FormErrors = {};
@@ -200,7 +208,7 @@ export class CreateUsers implements OnInit {
     if (!f.lastname.trim())       e.lastname = 'El apellido es requerido';
     else if (f.lastname.trim().length < 2) e.lastname = 'Mínimo 2 caracteres';
     if (!f.email.trim())          e.email = 'El correo es requerido';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) e.email = 'Correo inválido';
+    else if (!this.isValidEmail(f.email)) e.email = 'Correo inválido';
     else if (this.usuarios.some(u => u.email === f.email)) e.email = 'Este correo ya está registrado';
     if (!f.password)              e.password = 'La contraseña es requerida';
     else if (f.password.length < 8) e.password = 'Mínimo 8 caracteres';
@@ -222,8 +230,8 @@ export class CreateUsers implements OnInit {
       lastname: this.form.lastname.trim(),
       email: this.form.email.trim(),
       password: this.form.password,
-      roleId: parseInt(this.form.roleId, 10),
-      equipoId: parseInt(this.form.equipoId, 10),
+      roleId: Number.parseInt(this.form.roleId, 10),
+      equipoId: Number.parseInt(this.form.equipoId, 10),
     };
 
     this.usuariosService.crearUsuario(payload).subscribe({
@@ -357,7 +365,7 @@ export class CreateUsers implements OnInit {
   }
 
   get rolInfo(): string {
-    const rol = this.ROLES.find(r => r.id === parseInt(this.form.roleId, 10));
+    const rol = this.ROLES.find(r => r.id === Number.parseInt(this.form.roleId, 10));
     if (!rol) return '';
     const scope = this.ROL_SCOPE_INFO[this.rolScope(rol.nombre)] || '';
     const area = this.ROL_AREA_INFO[this.rolArea(rol.nombre)];
@@ -368,6 +376,6 @@ export class CreateUsers implements OnInit {
 
   get previewRoleName(): string {
     if (!this.form.roleId) return '';
-    return this.ROLES.find(r => r.id === parseInt(this.form.roleId, 10))?.nombre || '';
+    return this.ROLES.find(r => r.id === Number.parseInt(this.form.roleId, 10))?.nombre || '';
   }
 }
