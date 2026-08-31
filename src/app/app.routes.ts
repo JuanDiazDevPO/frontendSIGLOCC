@@ -50,6 +50,13 @@ export const routes: Routes = [
         .then(m => m.ParametrosTemporadaComponent)
   },
   {
+    path: 'asignaciones',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./asignaciones/asignaciones.component')
+        .then(m => m.AsignacionesComponent)
+  },
+  {
     path: 'entregas',
     canActivate: [authGuard],
     loadComponent: () =>
