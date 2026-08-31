@@ -1,0 +1,370 @@
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-heading">Entregas · Momento 3 — La Entrega</div>
+        <div class="topbar-sub">
+          <label class="field-label-inline" for="temporadaHeaderSelect">Temporada</label>
+          <select id="temporadaHeaderSelect" class="form-input form-select form-select--sm"
+            [ngModel]="temporadaSeleccionada" (ngModelChange)="seleccionarTemporada($event)"
+            name="temporadaHeaderSelect" [disabled]="temporadasLoading">
+            <option value="">{{ temporadasLoading ? 'Cargando temporadas…' : 'Selecciona temporada' }}</option>
+            @for (t of temporadas; track t.id) {
+              <option [value]="t.id">{{ t.nombre }}{{ t.esActual ? ' (actual)' : '' }}</option>
+            }
+          </select>
+          @if (temporadasError) { <span class="field-error">⚠ {{ temporadasError }}</span> }
+        </div>
+      </div>
+      <button class="btn-primary" (click)="openCrear()" type="button" [disabled]="!temporadaSeleccionada">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nueva acta
+      </button>
+    </header>
+
+    <div class="content">
+
+      @if (entregasError) {
+        <div class="error-banner">⚠ {{ entregasError }}</div>
+      }
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card" [class.stat-card--active]="filtroEstado === ''" (click)="toggleFiltroEstado('')" role="button" tabindex="0" (keydown.enter)="toggleFiltroEstado('')">
+          <div class="stat-value">{{ stats.total }}</div>
+          <div class="stat-label">Total actas</div>
+        </div>
+        <div class="stat-card stat-card--ok" [class.stat-card--active]="filtroEstado === 'COMPLETADA'" (click)="toggleFiltroEstado('COMPLETADA')" role="button" tabindex="0" (keydown.enter)="toggleFiltroEstado('COMPLETADA')">
+          <div class="stat-value stat-value--ok">{{ stats.completadas }}</div>
+          <div class="stat-label">Completadas</div>
+        </div>
+        <div class="stat-card stat-card--pending" [class.stat-card--active]="filtroEstado === 'PENDIENTE'" (click)="toggleFiltroEstado('PENDIENTE')" role="button" tabindex="0" (keydown.enter)="toggleFiltroEstado('PENDIENTE')">
+          <div class="stat-value stat-value--pending">{{ stats.pendientes }}</div>
+          <div class="stat-label">Pendientes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value stat-value--accent">{{ stats.items.toLocaleString('es-CO') }}</div>
+          <div class="stat-label">Ítems entregados</div>
+        </div>
+      </div>
+
+      <!-- Search / filter -->
+      <div class="toolbar">
+        <div class="search-wrap">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-input" [(ngModel)]="search" name="search" type="text" placeholder="Buscar por iglesia o ciudad…" aria-label="Buscar por iglesia o ciudad" />
+        </div>
+        @if (search || filtroEstado) {
+          <button class="link-btn" (click)="limpiarFiltros()" type="button">✕ Limpiar</button>
+        }
+        <span class="result-count">{{ filtradas.length }} acta{{ filtradas.length !== 1 ? 's' : '' }}</span>
+      </div>
+
+      <!-- Table -->
+      <div class="table-card">
+        <div class="table-scroll">
+          <table class="entregas-table">
+            <thead>
+              <tr>
+                <th>Acta</th>
+                <th>Iglesia</th>
+                <th>Punto</th>
+                <th>Fecha</th>
+                <th class="col-right">Ítems</th>
+                <th>Firma</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (entregasLoading) {
+                <tr><td colspan="7" class="empty-cell"><span class="spinner-sm spinner-sm--dark"></span> Cargando actas de entrega…</td></tr>
+              } @else if (filtradas.length === 0) {
+                <tr>
+                  <td colspan="7" class="empty-cell">
+                    <div class="empty-icon">🚚</div>
+                    Sin actas de entrega registradas
+                  </td>
+                </tr>
+              } @else {
+                @for (e of filtradas; track e.id) {
+                  <tr class="entrega-row" [class.entrega-row--pendiente]="e.estado === 'PENDIENTE'" (click)="abrirDetalle(e)" role="button" tabindex="0" (keydown.enter)="abrirDetalle(e)">
+                    <td class="col-id">#{{ e.id }}</td>
+                    <td>
+                      <div class="cell-title">{{ igNombre(e.iglesiaId) }}</div>
+                      <div class="cell-sub">{{ igCiudad(e.iglesiaId) }}</div>
+                    </td>
+                    <td class="cell-muted">{{ ptNombre(e.puntoEntregaId) }}</td>
+                    <td class="cell-muted nowrap">{{ fmtFecha(e.fechaEntrega) }}</td>
+                    <td class="col-right col-total">{{ totalDetalles(e).toLocaleString('es-CO') }}</td>
+                    <td>
+                      @if (e.firmaUrl) {
+                        <span class="firma-yes">✓ Sí</span>
+                      } @else {
+                        <span class="firma-no">Falta</span>
+                      }
+                    </td>
+                    <td>
+                      <span class="status-badge" [class]="'status-badge--' + e.estado.toLowerCase()">
+                        <span class="status-dot"></span>{{ ESTADO_META[e.estado].label }}
+                      </span>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ══════════════════════ DRAWER: CREAR ACTA ══════════════════════ -->
+  <div class="drawer-overlay" [class.drawer-overlay--open]="drawerCrearOpen" (click)="closeCrear()"></div>
+  <div class="drawer" [class.drawer--open]="drawerCrearOpen" role="dialog" aria-modal="true" aria-labelledby="crearActaTitle" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <div>
+        <div class="drawer-title" id="crearActaTitle">Nueva acta de entrega</div>
+        <div class="drawer-subtitle">{{ temporadaNombre(temporadaSeleccionada) }}</div>
+      </div>
+      <button class="icon-btn" (click)="closeCrear()" type="button" aria-label="Cerrar" [disabled]="loadingCrear">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="drawer-body">
+      <div class="info-note">
+        Solo iglesias <strong>APROBADAS</strong>. Una acta por iglesia por temporada. La firma y fotos se adjuntan después de crear el acta.
+        El equipo responsable se resuelve automáticamente por el backend a partir de tu sesión.
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="iglesiaId">Iglesia <span class="required">*</span></label>
+        <select id="iglesiaId" class="form-input form-select" [class.form-input--error]="errCrear('iglesiaId')"
+          [(ngModel)]="formCrear.iglesiaId" name="iglesiaId" [disabled]="iglesiasLoading">
+          <option value="">{{ iglesiasLoading ? 'Cargando iglesias…' : 'Seleccionar iglesia aprobada' }}</option>
+          @for (i of iglesiasAprobadas; track i.id) {
+            <option [value]="i.id">{{ i.nombre }} — {{ i.ciudad }}</option>
+          }
+        </select>
+        @if (iglesiasError) {
+          <span class="field-error">⚠ {{ iglesiasError }}</span>
+        } @else if (errCrear('iglesiaId')) {
+          <span class="field-error">⚠ {{ errCrear('iglesiaId') }}</span>
+        } @else if (!iglesiasLoading && iglesiasAprobadas.length === 0) {
+          <span class="field-hint">No hay iglesias aprobadas en esta temporada todavía.</span>
+        }
+      </div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label class="field-label" for="puntoEntregaId">Punto de entrega <span class="required">*</span></label>
+          <select id="puntoEntregaId" class="form-input form-select" [class.form-input--error]="errCrear('puntoEntregaId')"
+            [(ngModel)]="formCrear.puntoEntregaId" name="puntoEntregaId" [disabled]="puntosLoading">
+            <option value="">{{ puntosLoading ? 'Cargando…' : 'Seleccionar' }}</option>
+            @for (p of puntos; track p.id) {
+              <option [value]="p.id">{{ p.nombre }}</option>
+            }
+          </select>
+          @if (puntosError) {
+            <span class="field-error">⚠ {{ puntosError }}</span>
+          } @else if (errCrear('puntoEntregaId')) {
+            <span class="field-error">⚠ {{ errCrear('puntoEntregaId') }}</span>
+          }
+        </div>
+        <div class="field">
+          <label class="field-label" for="fechaEntrega">Fecha de entrega <span class="required">*</span></label>
+          <input id="fechaEntrega" class="form-input" [class.form-input--error]="errCrear('fechaEntrega')"
+            [(ngModel)]="formCrear.fechaEntrega" name="fechaEntrega" type="date" />
+          @if (errCrear('fechaEntrega')) { <span class="field-error">⚠ {{ errCrear('fechaEntrega') }}</span> }
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Tipo de firma</div>
+        <div class="segmented">
+          <button class="segmented-btn" [class.segmented-btn--active]="formCrear.firmaTipo === 'DIGITAL'" (click)="formCrear.firmaTipo = 'DIGITAL'" type="button">DIGITAL</button>
+          <button class="segmented-btn" [class.segmented-btn--active]="formCrear.firmaTipo === 'ESCANEADA'" (click)="formCrear.firmaTipo = 'ESCANEADA'" type="button">ESCANEADA</button>
+        </div>
+      </div>
+
+      <div class="section-label">Literatura entregada</div>
+      @if (errorDetalles && submittedCrear) {
+        <div class="field-error">⚠ {{ errorDetalles }}</div>
+      }
+      <div class="items-card">
+        @for (it of tiposItem; track it.id; let last = $last) {
+          <div class="items-row" [class.items-row--last]="last">
+            <div class="items-info">
+              <div class="items-name">{{ it.nombre }}</div>
+              <code class="items-code">{{ it.codigo }}</code>
+            </div>
+            <input class="items-qty" [class.items-qty--filled]="cantidadPositiva(it.id)" type="text" inputmode="numeric"
+              [value]="cantidades[it.id] || ''" (input)="setCantidad(it.id, $event)" placeholder="0" [attr.aria-label]="'Cantidad de ' + it.nombre" />
+          </div>
+        }
+        @if (totalItemsForm > 0) {
+          <div class="items-total">
+            <span>Total ítems</span>
+            <span>{{ totalItemsForm.toLocaleString('es-CO') }}</span>
+          </div>
+        }
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="observaciones">Observaciones</label>
+        <textarea id="observaciones" class="form-input form-textarea" [(ngModel)]="formCrear.observaciones" name="observaciones" rows="2" placeholder="Notas de la entrega…"></textarea>
+      </div>
+    </div>
+
+    <div class="drawer-footer">
+      <button class="btn-cancel" (click)="closeCrear()" type="button" [disabled]="loadingCrear">Cancelar</button>
+      <button class="btn-confirm" [disabled]="loadingCrear" (click)="submitCrear()" type="button">
+        @if (loadingCrear) {
+          <span class="spinner-sm"></span> Creando…
+        } @else {
+          Crear acta
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ DRAWER: DETALLE ══════════════════════ -->
+  <div class="drawer-overlay" [class.drawer-overlay--open]="!!detalle" (click)="closeDetalle()"></div>
+  @if (detalle) {
+    <div class="drawer drawer--wide drawer--open" role="dialog" aria-modal="true" aria-labelledby="detalleActaTitle" (click)="$event.stopPropagation()">
+      <div class="drawer-header">
+        <div>
+          <div class="detalle-heading">
+            <span id="detalleActaTitle" class="detalle-id">Acta #{{ detalle.id }}</span>
+            <span class="status-badge status-badge--big" [class]="'status-badge--' + detalle.estado.toLowerCase()">
+              <span class="status-dot"></span>{{ ESTADO_META[detalle.estado].label }}
+            </span>
+          </div>
+          <div class="detalle-sub">{{ igNombre(detalle.iglesiaId) }} · {{ igCiudad(detalle.iglesiaId) }} · {{ fmtFecha(detalle.fechaEntrega) }}</div>
+        </div>
+        <button class="icon-btn" (click)="closeDetalle()" type="button" aria-label="Cerrar">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="drawer-body">
+        <div class="grid-3">
+          <div class="info-box info-box--accent">
+            <div class="info-box__label">Total ítems</div>
+            <div class="info-box__value info-box__value--accent">{{ totalDetalles(detalle).toLocaleString('es-CO') }}</div>
+          </div>
+          <div class="info-box">
+            <div class="info-box__label">Punto</div>
+            <div class="info-box__value">{{ ptNombre(detalle.puntoEntregaId) }}</div>
+          </div>
+          <div class="info-box">
+            <div class="info-box__label">Confirmado</div>
+            <div class="info-box__value" [class.info-box__value--ok]="detalle.confirmado" [class.info-box__value--pending]="!detalle.confirmado">
+              {{ detalle.confirmado ? '✓ Sí' : 'Pendiente' }}
+            </div>
+          </div>
+        </div>
+
+        @if (detalle.observaciones) {
+          <div class="observaciones-box">💬 {{ detalle.observaciones }}</div>
+        }
+
+        <div>
+          <div class="section-label">Ítems entregados</div>
+          <div class="items-card">
+            @for (d of detalle.detalles; track d.tipoItemId; let last = $last) {
+              <div class="items-row items-row--readonly" [class.items-row--last]="last">
+                <div class="items-info-inline">
+                  <code class="items-code">{{ d.codigoItem }}</code>
+                  <span>{{ d.nombreItem }}</span>
+                </div>
+                <span class="items-qty-readonly">{{ d.cantidadEntregada.toLocaleString('es-CO') }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label">Firma del receptor · {{ detalle.firmaTipo }}</div>
+          @if (detalle.firmaUrl) {
+            <div class="firma-attached">
+              <div class="firma-attached__icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17.5V21h3.5L17 10.5 13.5 7 3 17.5z"/><path d="M14.5 6L18 9.5"/></svg>
+              </div>
+              <div class="firma-attached__name">{{ detalle.firmaUrl }}</div>
+              <span class="firma-attached__badge">✓ Adjunta</span>
+            </div>
+          } @else {
+            <label class="dropzone" [class.dropzone--loading]="uploadingFirma">
+              <input type="file" accept=".png,.jpg,.jpeg" class="sr-only-input" (change)="subirFirma(detalle.id, $event)" [disabled]="uploadingFirma" />
+              @if (uploadingFirma) {
+                <span class="spinner-sm spinner-sm--dark"></span> Subiendo…
+              } @else {
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17.5V21h3.5L17 10.5 13.5 7 3 17.5z"/><path d="M14.5 6L18 9.5"/></svg>
+                Adjuntar firma (PNG/JPG)
+              }
+            </label>
+          }
+        </div>
+
+        <div>
+          <div class="section-label">📷 Fotos Momento B — entrega a la iglesia</div>
+          <div class="photo-grid">
+            @for (f of (sesionFotosB[detalle.id] ?? []); track $index) {
+              <div class="photo-thumb">🖼️<span>Foto {{ $index + 1 }}</span></div>
+            }
+            <label class="photo-add" [class.photo-add--loading]="uploadingFotoB">
+              <input type="file" accept="image/*" class="sr-only-input" (change)="subirFotoB(detalle.id, $event)" [disabled]="uploadingFotoB" />
+              @if (uploadingFotoB) {
+                <span class="spinner-sm spinner-sm--dark"></span>
+              } @else {
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                <span>+ Foto</span>
+              }
+            </label>
+          </div>
+          <span class="field-hint">Solo se muestran las fotos subidas en esta sesión.</span>
+        </div>
+
+        <div>
+          <div class="section-label">📸 Fotos Momento C — entrega a los niños</div>
+          <div class="photo-grid">
+            @for (f of (sesionFotosC[detalle.id] ?? []); track $index) {
+              <div class="photo-thumb photo-thumb--ninos">🧒<span>Niños {{ $index + 1 }}</span></div>
+            }
+            <label class="photo-add" [class.photo-add--loading]="uploadingFotoC">
+              <input type="file" accept="image/*" class="sr-only-input" (change)="subirFotoC(detalle, $event)" [disabled]="uploadingFotoC" />
+              @if (uploadingFotoC) {
+                <span class="spinner-sm spinner-sm--dark"></span>
+              } @else {
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                <span>+ Foto</span>
+              }
+            </label>
+          </div>
+          <span class="field-hint">Solo se muestran las fotos subidas en esta sesión.</span>
+        </div>
+      </div>
+
+      @if (detalle.estado === 'PENDIENTE') {
+        <div class="drawer-footer">
+          <button class="btn-outline-warn" (click)="marcarCompletar(detalle.id, true)" type="button" [disabled]="loadingEstado">
+            @if (loadingEstado) { <span class="spinner-sm spinner-sm--dark"></span> } Marcar PARCIAL
+          </button>
+          <button class="btn-confirm btn-confirm--wide" (click)="marcarCompletar(detalle.id, false)" type="button" [disabled]="loadingEstado">
+            @if (loadingEstado) {
+              <span class="spinner-sm"></span>
+            } @else {
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            }
+            Marcar COMPLETADA
+          </button>
+        </div>
+      }
+    </div>
+  }
+</div>
