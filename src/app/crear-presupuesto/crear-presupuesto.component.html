@@ -290,12 +290,15 @@
           @if (!csvResult) {
             <!-- Drop zone -->
             <div class="drop-zone"
+              role="button" tabindex="0" aria-label="Seleccionar archivo CSV"
               [class.drop-zone--drag]="csvDrag"
               [class.drop-zone--file]="csvFile"
               (dragover)="onCsvDragOver($event)"
               (dragleave)="onCsvDragLeave()"
               (drop)="onCsvDrop($event)"
-              (click)="!csvFile && csvInput.click()">
+              (click)="!csvFile && csvInput.click()"
+              (keydown.enter)="!csvFile && csvInput.click()"
+              (keydown.space)="$event.preventDefault(); !csvFile && csvInput.click()">
               <input #csvInput type="file" accept=".csv" class="csv-file-input"
                 (change)="onCsvFileInput($event)" />
 

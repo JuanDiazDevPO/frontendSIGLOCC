@@ -135,7 +135,7 @@ export class ReporteMensualComponent implements OnInit {
   readonly CATEGORIAS = CATEGORIAS;
   readonly FAMILIA_INFO = FAMILIA_INFO;
   readonly MESES = MESES;
-  readonly FAMILIAS: Array<'E' | 'M' | 'O'> = ['E', 'M', 'O'];
+  readonly FAMILIAS: ('E' | 'M' | 'O')[] = ['E', 'M', 'O'];
 
   readonly LOCK_REASONS: Partial<Record<'E' | 'M' | 'O', string>> = {
     M: 'Los equipos ERL solo pueden reportar gastos de entrenamiento (familia E). El ERLE de tu región gestiona los rubros de Mentoría.',
