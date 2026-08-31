@@ -137,26 +137,24 @@
               <div class="field">
                 <div class="field-label">Rubro presupuestal <span class="required">*</span></div>
                 <div class="rubro-grid">
-                  <div class="rubro-card"
+                  <button
+                    type="button"
+                    class="rubro-card"
                     [class.rubro-card--selected]="form.tipoPresupuesto === 'ENTRENAMIENTO'"
                     (click)="selectRubro('ENTRENAMIENTO')"
-                    role="button"
-                    tabindex="0"
-                    (keydown.enter)="selectRubro('ENTRENAMIENTO')"
-                    (keydown.space)="selectRubro('ENTRENAMIENTO')">
+                    [attr.aria-pressed]="form.tipoPresupuesto === 'ENTRENAMIENTO'">
                     <div class="rubro-name" [class.rubro-name--selected]="form.tipoPresupuesto === 'ENTRENAMIENTO'">📚 ENTRENAMIENTO</div>
                     <div class="rubro-saldo">Saldo: <strong>{{ cop(SALDO_DISPONIBLE['ENTRENAMIENTO']) }}</strong></div>
-                  </div>
-                  <div class="rubro-card"
+                  </button>
+                  <button
+                    type="button"
+                    class="rubro-card"
                     [class.rubro-card--selected]="form.tipoPresupuesto === 'MENTOREO'"
                     (click)="selectRubro('MENTOREO')"
-                    role="button"
-                    tabindex="0"
-                    (keydown.enter)="selectRubro('MENTOREO')"
-                    (keydown.space)="selectRubro('MENTOREO')">
+                    [attr.aria-pressed]="form.tipoPresupuesto === 'MENTOREO'">
                     <div class="rubro-name" [class.rubro-name--selected]="form.tipoPresupuesto === 'MENTOREO'">🤝 MENTOREO</div>
                     <div class="rubro-saldo">Saldo: <strong>{{ cop(SALDO_DISPONIBLE['MENTOREO']) }}</strong></div>
-                  </div>
+                  </button>
                 </div>
                 @if (err('tipoPresupuesto')) {
                   <span class="field-error">⚠ {{ err('tipoPresupuesto') }}</span>
