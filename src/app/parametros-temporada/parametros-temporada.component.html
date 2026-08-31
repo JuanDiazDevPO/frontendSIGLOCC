@@ -1,0 +1,476 @@
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-heading">Parámetros financieros de temporada</div>
+        <div class="topbar-sub">
+          <span class="rol-badge">Rol requerido: <code>ENL_RECURSOS</code></span>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="temporada-picker">
+          <label class="field-label-inline" for="temporadaHeaderSelect">Temporada</label>
+          <select
+            id="temporadaHeaderSelect"
+            class="form-input form-select"
+            [ngModel]="selectedTemporadaId"
+            (ngModelChange)="onSelectTemporada($event)"
+            name="selectedTemporadaId"
+            [disabled]="temporadasLoading">
+            <option value="">{{ temporadasLoading ? 'Cargando temporadas…' : 'Selecciona temporada' }}</option>
+            @for (t of temporadas; track t.id) {
+              <option [value]="t.id">{{ t.nombre }}{{ t.esActual ? ' (actual)' : '' }}</option>
+            }
+          </select>
+          @if (modo === 'loading') {
+            <span class="status-badge status-badge--loading"><span class="spinner-sm spinner-sm--dark"></span> Consultando…</span>
+          } @else if (modo === 'actualizar') {
+            <span class="status-badge status-badge--ok">✓ Configurada</span>
+          } @else if (modo === 'crear') {
+            <span class="status-badge status-badge--pending">Sin configurar</span>
+          }
+        </div>
+
+        <button class="btn-action" (click)="openCloneModal()" type="button">
+          🧬 Clonar desde otra temporada
+        </button>
+        <button class="btn-action btn-action--warn" (click)="openTrmModal()" type="button"
+          [disabled]="modo !== 'actualizar'"
+          [title]="modo !== 'actualizar' ? 'La temporada seleccionada aún no tiene parámetros configurados' : ''">
+          📈 Actualizar TRM
+        </button>
+      </div>
+    </header>
+
+    <div class="content-area">
+      <div class="form-panel">
+
+        @if (temporadasError) {
+          <div class="mode-banner mode-banner--error">
+            <span class="mode-banner__icon">⚠️</span>
+            <div>
+              <div class="mode-banner__title">{{ temporadasError }}</div>
+            </div>
+          </div>
+        }
+
+        <!-- Banner de modo -->
+        @if (modo === 'loading') {
+          <div class="mode-banner mode-banner--loading">
+            <span class="mode-banner__icon"><span class="spinner-sm spinner-sm--dark"></span></span>
+            <div>
+              <div class="mode-banner__title">{{ selectedTemporadaId ? 'Consultando parámetros existentes…' : 'Selecciona una temporada para continuar' }}</div>
+            </div>
+          </div>
+        } @else if (modo === 'actualizar') {
+          <div class="mode-banner mode-banner--actualizar">
+            <span class="mode-banner__icon">⚠️</span>
+            <div>
+              <div class="mode-banner__title">Modo actualización — {{ temporadaNombre(+selectedTemporadaId) }} ya tiene parámetros configurados</div>
+              <div class="mode-banner__sub">Al guardar se sobrescribirán los valores existentes para esta temporada.</div>
+            </div>
+          </div>
+        } @else {
+          <div class="mode-banner mode-banner--crear">
+            <span class="mode-banner__icon">✅</span>
+            <div>
+              <div class="mode-banner__title">Modo creación — {{ temporadaNombre(+selectedTemporadaId) }} aún no tiene parámetros</div>
+              <div class="mode-banner__sub">
+                Al guardar se desbloqueará el módulo de presupuestos para los equipos de esta temporada.
+                ¿Ya existen parámetros en otra temporada?
+                <button class="link-btn" (click)="openCloneModal(+selectedTemporadaId)" type="button">Clonar desde temporada anterior</button>
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (submittedCompleto && erroresCount > 0) {
+          <div class="error-summary" role="alert">
+            ⚠ Hay {{ erroresCount }} campo{{ erroresCount === 1 ? '' : 's' }} con error. Revisa el formulario resaltado.
+          </div>
+        }
+
+        <!-- Sección: General -->
+        <div class="form-section">
+          <div class="section-header">
+            <div class="section-header__icon">🗓️</div>
+            <div>
+              <div class="section-header__title">General</div>
+              <div class="section-header__sub">Tasa de cambio y estándares logísticos de la temporada</div>
+            </div>
+          </div>
+          <div class="grid-3">
+            <div class="field">
+              <label class="field-label" for="tasaCambio">
+                Tasa de cambio (TRM) <span class="required">*</span>
+                <span class="tooltip" title="Pesos colombianos por dólar pactados al inicio de la temporada.">ⓘ</span>
+              </label>
+              <div class="affixed-input">
+                <span class="affix affix--prefix">COP</span>
+                <input id="tasaCambio" class="form-input form-input--affixed" [class.form-input--error]="errCompleto('tasaCambio')"
+                  [(ngModel)]="formCompleto.tasaCambio" name="tasaCambio" type="number" step="0.01" min="0"
+                  [placeholder]="'Ej: ' + REFERENCIA.tasaCambio" [disabled]="!selectedTemporadaId" />
+                <span class="affix affix--suffix">/ USD</span>
+              </div>
+              @if (errCompleto('tasaCambio')) {
+                <span class="field-error">⚠ {{ errCompleto('tasaCambio') }}</span>
+              } @else if (tasaCambioFormateada) {
+                <span class="field-hint">≈ $ {{ tasaCambioFormateada }} COP/USD</span>
+              }
+            </div>
+            <div class="field">
+              <label class="field-label" for="cajasPorContenedor">
+                Cajas por contenedor <span class="required">*</span>
+                <span class="tooltip" title="Estándar de cajas que llegan en cada contenedor.">ⓘ</span>
+              </label>
+              <input id="cajasPorContenedor" class="form-input" [class.form-input--error]="errCompleto('cajasPorContenedor')"
+                [(ngModel)]="formCompleto.cajasPorContenedor" name="cajasPorContenedor" type="number" min="0" step="1"
+                [placeholder]="'Ej: ' + REFERENCIA.cajasPorContenedor" [disabled]="!selectedTemporadaId" />
+              @if (errCompleto('cajasPorContenedor')) {
+                <span class="field-error">⚠ {{ errCompleto('cajasPorContenedor') }}</span>
+              } @else {
+                <span class="field-hint">Valor de referencia: {{ REFERENCIA.cajasPorContenedor }}</span>
+              }
+            </div>
+            <div class="field">
+              <label class="field-label" for="porcentajeLga">
+                Porcentaje LGA <span class="required">*</span>
+                <span class="tooltip" title="Factor de eficiencia LGA. Decimal entre 0 y 1.">ⓘ</span>
+              </label>
+              <div class="affixed-input">
+                <input id="porcentajeLga" class="form-input form-input--affixed-suffix" [class.form-input--error]="errCompleto('porcentajeLga')"
+                  [(ngModel)]="formCompleto.porcentajeLga" name="porcentajeLga" type="number" step="0.01" min="0" max="1"
+                  [placeholder]="'Ej: ' + REFERENCIA.porcentajeLga" [disabled]="!selectedTemporadaId" />
+                <span class="affix affix--suffix">0–1</span>
+              </div>
+              @if (errCompleto('porcentajeLga')) {
+                <span class="field-error">⚠ {{ errCompleto('porcentajeLga') }}</span>
+              } @else {
+                <span class="field-hint">
+                  Valor de referencia: {{ REFERENCIA.porcentajeLga }}
+                  @if (porcentajeLgaPct) { · = {{ porcentajeLgaPct }} }
+                </span>
+              }
+            </div>
+          </div>
+          <div class="field computed-field">
+            <div class="field-label">CM efectivos / contenedor</div>
+            <div class="computed-box">{{ cmPorContenedor.toLocaleString('es-CO') }}</div>
+            <span class="field-hint">cajas × % LGA (calculado)</span>
+          </div>
+        </div>
+
+        <!-- Sección: Presentación de Visión (PV) -->
+        <div class="form-section form-section--divided">
+          <div class="section-header">
+            <div class="section-header__icon">👁️</div>
+            <div>
+              <div class="section-header__title">Presentación de Visión (PV)</div>
+              <div class="section-header__sub">Costos unitarios por persona en USD</div>
+            </div>
+          </div>
+          <div class="grid-3">
+            <div class="field">
+              <label class="field-label" for="usdAdminCm">
+                Administración CM <span class="required">*</span>
+                <span class="tooltip" title="Costo total de administración por Crucita Misionera.">ⓘ</span>
+              </label>
+              <div class="affixed-input">
+                <span class="affix affix--prefix">USD</span>
+                <input id="usdAdminCm" class="form-input form-input--affixed" [class.form-input--error]="errCompleto('usdAdminCm')"
+                  [(ngModel)]="formCompleto.usdAdminCm" name="usdAdminCm" type="number" step="0.01" min="0"
+                  [placeholder]="'Ej: ' + REFERENCIA.usdAdminCm" [disabled]="!selectedTemporadaId" />
+              </div>
+              @if (errCompleto('usdAdminCm')) { <span class="field-error">⚠ {{ errCompleto('usdAdminCm') }}</span> }
+            </div>
+            <div class="field">
+              <label class="field-label" for="usdRefrigeroPv">Refrigerio en PV <span class="required">*</span></label>
+              <div class="affixed-input">
+                <span class="affix affix--prefix">USD</span>
+                <input id="usdRefrigeroPv" class="form-input form-input--affixed-both" [class.form-input--error]="errCompleto('usdRefrigeroPv')"
+                  [(ngModel)]="formCompleto.usdRefrigeroPv" name="usdRefrigeroPv" type="number" step="0.01" min="0"
+                  [placeholder]="'Ej: ' + REFERENCIA.usdRefrigeroPv" [disabled]="!selectedTemporadaId" />
+                <span class="affix affix--suffix">/ persona</span>
+              </div>
+              @if (errCompleto('usdRefrigeroPv')) { <span class="field-error">⚠ {{ errCompleto('usdRefrigeroPv') }}</span> }
+            </div>
+            <div class="field">
+              <label class="field-label" for="usdTransportePv">Transporte en PV <span class="required">*</span></label>
+              <div class="affixed-input">
+                <span class="affix affix--prefix">USD</span>
+                <input id="usdTransportePv" class="form-input form-input--affixed-both" [class.form-input--error]="errCompleto('usdTransportePv')"
+                  [(ngModel)]="formCompleto.usdTransportePv" name="usdTransportePv" type="number" step="0.01" min="0"
+                  [placeholder]="'Ej: ' + REFERENCIA.usdTransportePv" [disabled]="!selectedTemporadaId" />
+                <span class="affix affix--suffix">/ persona</span>
+              </div>
+              @if (errCompleto('usdTransportePv')) { <span class="field-error">⚠ {{ errCompleto('usdTransportePv') }}</span> }
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección: Capacitación -->
+        <div class="form-section form-section--divided">
+          <div class="section-header">
+            <div class="section-header__icon">C</div>
+            <div>
+              <div class="section-header__title">Capacitación</div>
+              <div class="section-header__sub">Costos unitarios por persona en cada jornada</div>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label" for="usdTransporteCap">Transporte capacitación <span class="required">*</span></label>
+              <div class="affixed-input">
+                <span class="affix affix--prefix">USD</span>
+                <input id="usdTransporteCap" class="form-input form-input--affixed-both" [class.form-input--error]="errCompleto('usdTransporteCap')"
+                  [(ngModel)]="formCompleto.usdTransporteCap" name="usdTransporteCap" type="number" step="0.01" min="0"
+                  [placeholder]="'Ej: ' + REFERENCIA.usdTransporteCap" [disabled]="!selectedTemporadaId" />
+                <span class="affix affix--suffix">/ persona</span>
+              </div>
+              @if (errCompleto('usdTransporteCap')) { <span class="field-error">⚠ {{ errCompleto('usdTransporteCap') }}</span> }
+            </div>
+            <div class="field">
+              <label class="field-label" for="usdRefrierioCap">
+                Refrigerio capacitación <span class="required">*</span>
+                <span class="tooltip" title="Coincide con el campo usdRefrierioCap del backend.">ⓘ</span>
+              </label>
+              <div class="affixed-input">
+                <span class="affix affix--prefix">USD</span>
+                <input id="usdRefrierioCap" class="form-input form-input--affixed-both" [class.form-input--error]="errCompleto('usdRefrierioCap')"
+                  [(ngModel)]="formCompleto.usdRefrierioCap" name="usdRefrierioCap" type="number" step="0.01" min="0"
+                  [placeholder]="'Ej: ' + REFERENCIA.usdRefrierioCap" [disabled]="!selectedTemporadaId" />
+                <span class="affix affix--suffix">/ persona</span>
+              </div>
+              @if (errCompleto('usdRefrierioCap')) { <span class="field-error">⚠ {{ errCompleto('usdRefrierioCap') }}</span> }
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección: Mentoría -->
+        <div class="form-section form-section--divided">
+          <div class="section-header">
+            <div class="section-header__icon">M</div>
+            <div>
+              <div class="section-header__title">Mentoría</div>
+              <div class="section-header__sub">Configuración de las visitas de mentoría a equipos</div>
+            </div>
+          </div>
+          <div class="grid-2" style="margin-bottom: 14px;">
+            <div class="field">
+              <label class="field-label" for="visitasMentoreo">Visitas de mentoría / equipo <span class="required">*</span></label>
+              <input id="visitasMentoreo" class="form-input" [class.form-input--error]="errCompleto('visitasMentoreo')"
+                [(ngModel)]="formCompleto.visitasMentoreo" name="visitasMentoreo" type="number" min="0" step="1"
+                [placeholder]="'Ej: ' + REFERENCIA.visitasMentoreo" [disabled]="!selectedTemporadaId" />
+              @if (errCompleto('visitasMentoreo')) {
+                <span class="field-error">⚠ {{ errCompleto('visitasMentoreo') }}</span>
+              } @else {
+                <span class="field-hint">Valor de referencia: {{ REFERENCIA.visitasMentoreo }}</span>
+              }
+            </div>
+            <div class="field">
+              <label class="field-label" for="personasPorVisita">Personas por visita <span class="required">*</span></label>
+              <input id="personasPorVisita" class="form-input" [class.form-input--error]="errCompleto('personasPorVisita')"
+                [(ngModel)]="formCompleto.personasPorVisita" name="personasPorVisita" type="number" min="0" step="1"
+                [placeholder]="'Ej: ' + REFERENCIA.personasPorVisita" [disabled]="!selectedTemporadaId" />
+              @if (errCompleto('personasPorVisita')) {
+                <span class="field-error">⚠ {{ errCompleto('personasPorVisita') }}</span>
+              } @else {
+                <span class="field-hint">Valor de referencia: {{ REFERENCIA.personasPorVisita }}</span>
+              }
+            </div>
+          </div>
+          <div class="grid-4">
+            <div class="field">
+              <label class="field-label" for="usdTransporteMentoreo">Transporte <span class="required">*</span></label>
+              <div class="affixed-input">
+                <span class="affix affix--prefix">USD</span>
+                <input id="usdTransporteMentoreo" class="form-input form-input--affixed-both" [class.form-input--error]="errCompleto('usdTransporteMentoreo')"
+                  [(ngModel)]="formCompleto.usdTransporteMentoreo" name="usdTransporteMentoreo" type="number" step="0.01" min="0"
+                  [placeholder]="'Ej: ' + REFERENCIA.usdTransporteMentoreo" [disabled]="!selectedTemporadaId" />
+                <span class="affix affix--suffix">/ pers</span>
+              </div>
+              @if (errCompleto('usdTransporteMentoreo')) { <span class="field-error">⚠ {{ errCompleto('usdTransporteMentoreo') }}</span> }
+            </div>
+            <div class="field">
+              <label class="field-label" for="usdAlimentoMentoreo">Alimentación <span class="required">*</span></label>
+              <div class="affixed-input">
+                <span class="affix affix--prefix">USD</span>
+                <input id="usdAlimentoMentoreo" class="form-input form-input--affixed-both" [class.form-input--error]="errCompleto('usdAlimentoMentoreo')"
+                  [(ngModel)]="formCompleto.usdAlimentoMentoreo" name="usdAlimentoMentoreo" type="number" step="0.01" min="0"
+                  [placeholder]="'Ej: ' + REFERENCIA.usdAlimentoMentoreo" [disabled]="!selectedTemporadaId" />
+                <span class="affix affix--suffix">/ pers</span>
+              </div>
+              @if (errCompleto('usdAlimentoMentoreo')) { <span class="field-error">⚠ {{ errCompleto('usdAlimentoMentoreo') }}</span> }
+            </div>
+            <div class="field">
+              <label class="field-label" for="usdHospedajeMentoreo">Hospedaje <span class="required">*</span></label>
+              <div class="affixed-input">
+                <span class="affix affix--prefix">USD</span>
+                <input id="usdHospedajeMentoreo" class="form-input form-input--affixed-both" [class.form-input--error]="errCompleto('usdHospedajeMentoreo')"
+                  [(ngModel)]="formCompleto.usdHospedajeMentoreo" name="usdHospedajeMentoreo" type="number" step="0.01" min="0"
+                  [placeholder]="'Ej: ' + REFERENCIA.usdHospedajeMentoreo" [disabled]="!selectedTemporadaId" />
+                <span class="affix affix--suffix">/ pers</span>
+              </div>
+              @if (errCompleto('usdHospedajeMentoreo')) { <span class="field-error">⚠ {{ errCompleto('usdHospedajeMentoreo') }}</span> }
+            </div>
+            <div class="field">
+              <label class="field-label" for="usdAdminMentoreo">
+                Administración <span class="required">*</span>
+                <span class="tooltip" title="Costo administrativo por visita de mentoría.">ⓘ</span>
+              </label>
+              <div class="affixed-input">
+                <span class="affix affix--prefix">USD</span>
+                <input id="usdAdminMentoreo" class="form-input form-input--affixed-both" [class.form-input--error]="errCompleto('usdAdminMentoreo')"
+                  [(ngModel)]="formCompleto.usdAdminMentoreo" name="usdAdminMentoreo" type="number" step="0.01" min="0"
+                  [placeholder]="'Ej: ' + REFERENCIA.usdAdminMentoreo" [disabled]="!selectedTemporadaId" />
+                <span class="affix affix--suffix">/ visita</span>
+              </div>
+              @if (errCompleto('usdAdminMentoreo')) { <span class="field-error">⚠ {{ errCompleto('usdAdminMentoreo') }}</span> }
+            </div>
+          </div>
+        </div>
+
+        <!-- Acciones -->
+        <div class="submit-row">
+          <button class="btn-outline" (click)="resetCompleto()" type="button" [disabled]="!selectedTemporadaId">Limpiar formulario</button>
+          <button class="btn-submit" [class.btn-submit--loading]="loadingCompleto" [disabled]="loadingCompleto || !selectedTemporadaId" (click)="submitCompleto()" type="button">
+            @if (loadingCompleto) {
+              <span class="spinner-sm"></span> Guardando…
+            } @else {
+              {{ modo === 'actualizar' ? 'Actualizar parámetros' : 'Crear parámetros' }}
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ MODAL: CLONAR ══════════════════════ -->
+    @if (cloneModalOpen) {
+      <div class="modal-overlay" (click)="closeCloneModal()">
+        <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="cloneModalTitle" (click)="$event.stopPropagation()">
+          <div class="modal-body">
+            <div class="modal-icon">🧬</div>
+            <div>
+              <div class="modal-title" id="cloneModalTitle">Clonar parámetros entre temporadas</div>
+              <div class="modal-desc">Copia todos los valores financieros de una temporada existente a una nueva.</div>
+            </div>
+          </div>
+
+          <div class="modal-content">
+            <div class="clone-grid">
+              <div class="field">
+                <label class="field-label" for="origenId">Temporada origen <span class="required">*</span></label>
+                <select id="origenId" class="form-input form-select" [(ngModel)]="origenId" name="origenId">
+                  <option value="">Selecciona origen</option>
+                  @for (t of temporadas; track t.id) {
+                    <option [value]="t.id">{{ t.nombre }}{{ hasParametrosLabel(t.id) }}</option>
+                  }
+                </select>
+              </div>
+              <div class="clone-arrow" [class.clone-arrow--active]="clonarPuedeEnviar">→</div>
+              <div class="field">
+                <label class="field-label" for="destinoId">Temporada destino <span class="required">*</span></label>
+                <select id="destinoId" class="form-input form-select" [(ngModel)]="destinoId" name="destinoId">
+                  <option value="">Selecciona destino</option>
+                  @for (t of temporadas; track t.id) {
+                    <option [value]="t.id">{{ t.nombre }}{{ hasParametrosLabel(t.id) }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+
+            @if (origenSinParametrosAdvertencia) {
+              <div class="error-inline-msg-block">⚠ La temporada origen no tiene parámetros configurados aún. El servidor rechazará la clonación.</div>
+            }
+            @if (destinoConParametrosAdvertencia) {
+              <div class="error-inline-msg-block">⚠ La temporada destino ya tiene parámetros — el servidor rechazará sobrescribirlos por esta vía.</div>
+            }
+            @if (clonarMismaTemporada) {
+              <div class="error-inline-msg-block">⚠ La temporada origen y destino deben ser distintas.</div>
+            }
+          </div>
+
+          <div class="modal-footer">
+            <div class="modal-actions">
+              <button class="btn-cancel" (click)="closeCloneModal()" type="button" [disabled]="loadingClonar">Cancelar</button>
+              <button class="btn-confirm btn-confirm--success" [disabled]="!clonarPuedeEnviar" (click)="submitClonar()" type="button">
+                @if (loadingClonar) {
+                  <span class="spinner-sm"></span> Clonando…
+                } @else {
+                  Clonar parámetros
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ══════════════════════ MODAL: ACTUALIZAR TRM ══════════════════════ -->
+    @if (trmModalOpen) {
+      <div class="modal-overlay" (click)="closeTrmModal()">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="trmModalTitle" (click)="$event.stopPropagation()">
+          <div class="modal-body">
+            <div class="modal-icon modal-icon--danger">⚠️</div>
+            <div>
+              <div class="modal-title" id="trmModalTitle">Actualizar tasa de cambio</div>
+              <div class="modal-desc">
+                <strong>Operación de alto impacto.</strong> Al cambiar la TRM, todos los saldos de presupuesto del país
+                se recalcularán automáticamente para <strong>{{ temporadaNombre(+selectedTemporadaId) }}</strong>.
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-content">
+            <div class="grid-2">
+              <div class="field">
+                <label class="field-label" for="trmActualInput">TRM actual</label>
+                <div class="affixed-input">
+                  <span class="affix affix--prefix">COP</span>
+                  <input id="trmActualInput" class="form-input form-input--affixed disabled-input" type="text"
+                    [value]="trmActual !== null ? trmActual.toLocaleString('es-CO') : '—'" disabled />
+                  <span class="affix affix--suffix">/ USD</span>
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label" for="trmNueva">Nueva TRM <span class="required">*</span></label>
+                <div class="affixed-input">
+                  <span class="affix affix--prefix">COP</span>
+                  <input id="trmNueva" class="form-input form-input--affixed" [(ngModel)]="trmNueva" name="trmNueva" type="number" step="0.01" min="0" />
+                  <span class="affix affix--suffix">/ USD</span>
+                </div>
+              </div>
+            </div>
+            <div class="field" style="margin-top: 14px;">
+              <div class="field-label">Variación</div>
+              <div class="delta-box" [class.delta-box--up]="trmDelta >= 0" [class.delta-box--down]="trmDelta < 0">
+                <span>{{ trmDelta >= 0 ? '▲' : '▼' }}</span>
+                <span>{{ trmDelta >= 0 ? '+' : '' }}{{ trmDelta | number: '1.2-2' }} COP</span>
+                <span class="delta-box__pct">({{ trmDeltaPct >= 0 ? '+' : '' }}{{ trmDeltaPct | number: '1.2-2' }}%)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <div class="modal-actions">
+              <button class="btn-cancel" (click)="closeTrmModal()" type="button" [disabled]="loadingTrm">Cancelar</button>
+              <button class="btn-confirm btn-confirm--danger" [disabled]="!trmValido || loadingTrm" (click)="submitTrm()" type="button">
+                @if (loadingTrm) {
+                  <span class="spinner-sm"></span> Actualizando…
+                } @else {
+                  Sí, actualizar TRM
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+  </main>
+</div>
