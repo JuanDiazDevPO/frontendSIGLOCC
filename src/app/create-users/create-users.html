@@ -271,14 +271,16 @@
         <div class="field">
           <label class="field-label">Rol <span class="required">*</span></label>
           <select class="form-input form-select" [class.form-input--error]="submitted && errors.roleId"
-            [(ngModel)]="form.roleId">
-            <option value="">Seleccionar rol</option>
+            [(ngModel)]="form.roleId" [disabled]="rolesLoading || !!rolesError">
+            <option value="">{{ rolesLoading ? 'Cargando roles…' : 'Seleccionar rol' }}</option>
             @for (r of ROLES; track r.id) {
-              <option [value]="r.id">{{ r.name }}</option>
+              <option [value]="r.id">{{ r.nombre }}</option>
             }
           </select>
           @if (submitted && errors.roleId) {
             <span class="field-error">⚠ {{ errors.roleId }}</span>
+          } @else if (rolesError) {
+            <span class="field-error">⚠ {{ rolesError }} <button class="field-retry" type="button" (click)="loadRoles()">Reintentar</button></span>
           } @else {
             <span class="field-hint">Define los permisos del usuario en el sistema</span>
           }
@@ -291,14 +293,16 @@
         <div class="field">
           <label class="field-label">Equipo <span class="required">*</span></label>
           <select class="form-input form-select" [class.form-input--error]="submitted && errors.equipoId"
-            [(ngModel)]="form.equipoId">
-            <option value="">Seleccionar equipo</option>
+            [(ngModel)]="form.equipoId" [disabled]="equiposLoading || !!equiposError">
+            <option value="">{{ equiposLoading ? 'Cargando equipos…' : 'Seleccionar equipo' }}</option>
             @for (e of EQUIPOS; track e.id) {
               <option [value]="e.id">{{ e.nombre }} ({{ e.tipo }})</option>
             }
           </select>
           @if (submitted && errors.equipoId) {
             <span class="field-error">⚠ {{ errors.equipoId }}</span>
+          } @else if (equiposError) {
+            <span class="field-error">⚠ {{ equiposError }} <button class="field-retry" type="button" (click)="loadEquipos()">Reintentar</button></span>
           } @else {
             <span class="field-hint">Jerarquía: ENL → ERLE → ERL</span>
           }
