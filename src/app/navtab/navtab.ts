@@ -33,7 +33,7 @@ export class Navtab {
     { icon: '⊞', label: 'Temporadas',   route: null },
     { icon: '⚙', label: 'Parámetros',   route: '/temporadas/parametros', roles: ['ENL_RECURSOS'] },
     { icon: '⛪', label: 'Iglesias',     route: null },
-    { icon: '📦', label: 'Asignaciones', route: null },
+    { icon: '📦', label: 'Asignaciones', route: '/asignaciones' },
     { icon: '🚚', label: 'Entregas',     route: null },
     { icon: '💰', label: 'Anticipos',    route: '/anticipos/crear' },
     { icon: '📊', label: 'Presupuestos', route: '/presupuestos/crear' },

@@ -1,0 +1,301 @@
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+
+    @if (!seleccionada) {
+      <!-- ══════════════════════ LISTADO DE CORRIDAS ══════════════════════ -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="topbar-heading">Asignación Inteligente</div>
+          <div class="topbar-sub">
+            <label class="field-label-inline" for="temporadaHeaderSelect">Temporada</label>
+            <select id="temporadaHeaderSelect" class="form-input form-select form-select--sm"
+              [ngModel]="temporadaSeleccionada" (ngModelChange)="seleccionarTemporada($event)"
+              name="temporadaHeaderSelect" [disabled]="temporadasLoading">
+              <option value="">{{ temporadasLoading ? 'Cargando temporadas…' : 'Selecciona temporada' }}</option>
+              @for (t of temporadas; track t.id) {
+                <option [value]="t.id">{{ t.nombre }}{{ t.esActual ? ' (actual)' : '' }}</option>
+              }
+            </select>
+            @if (temporadasError) { <span class="field-error">⚠ {{ temporadasError }}</span> }
+          </div>
+        </div>
+        <button class="btn-primary" (click)="generar()" type="button" [disabled]="generando || !temporadaSeleccionada">
+          @if (generando) {
+            <span class="spinner-sm"></span> Generando…
+          } @else {
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Generar asignación automática
+          }
+        </button>
+      </header>
+
+      <div class="content">
+        @if (asignacionesError) {
+          <div class="error-banner">⚠ {{ asignacionesError }}</div>
+        }
+
+        <div class="info-banner">
+          <div class="info-banner__icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <div>
+            <div class="info-banner__title">Motor de distribución automática (Método Hamilton)</div>
+            <div class="info-banner__desc">
+              Reparte el inventario disponible proporcionalmente entre todas las <strong>iglesias APROBADAS</strong> con cajas solicitadas.
+              Si el stock no alcanza, aplica un <strong>factor de reducción</strong> equitativo. El resultado queda en <strong>BORRADOR</strong>
+              para revisión y ajuste manual antes de confirmar.
+            </div>
+          </div>
+        </div>
+
+        <div class="table-card">
+          <div class="table-card__head">{{ asignaciones.length }} corrida{{ asignaciones.length !== 1 ? 's' : '' }} de asignación</div>
+          <div class="table-scroll">
+            <table class="asig-table">
+              <thead>
+                <tr>
+                  <th>Corrida</th>
+                  <th>Generación</th>
+                  <th class="col-right">Disponibles</th>
+                  <th class="col-right">Solicitadas</th>
+                  <th class="col-right">Factor</th>
+                  <th>Estado</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                @if (asignacionesLoading) {
+                  <tr><td colspan="7" class="empty-cell"><span class="spinner-sm spinner-sm--dark"></span> Cargando corridas…</td></tr>
+                } @else if (asignaciones.length === 0) {
+                  <tr>
+                    <td colspan="7" class="empty-cell">
+                      <div class="empty-icon">📦</div>
+                      Aún no hay corridas. Genera la primera asignación automática.
+                    </td>
+                  </tr>
+                } @else {
+                  @for (a of asignaciones; track a.id) {
+                    <tr class="asig-row" (click)="abrirMatriz(a)" role="button" tabindex="0" (keydown.enter)="abrirMatriz(a)">
+                      <td>
+                        <div class="corrida-id">
+                          <span>#{{ a.id }}</span>
+                          @if (a.generadaAutomaticamente) {
+                            <span class="bolt-badge" title="Método Hamilton">
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            </span>
+                          }
+                        </div>
+                      </td>
+                      <td class="cell-muted nowrap">{{ fmtFechaHora(a.fechaGeneracion) }}</td>
+                      <td class="col-right col-disponibles">{{ a.totalCajasDisponibles.toLocaleString('es-CO') }}</td>
+                      <td class="col-right col-solicitadas">{{ a.totalCajasSolicitadas.toLocaleString('es-CO') }}</td>
+                      <td class="col-right">
+                        <span class="factor-value" [class.factor-value--reducido]="a.factorReduccion < 1">{{ a.factorReduccion.toFixed(2) }}</span>
+                      </td>
+                      <td>
+                        <span class="status-badge" [class]="'status-badge--' + a.estado.toLowerCase()">
+                          <span class="status-dot"></span>{{ a.estado === 'CONFIRMADA' ? 'Confirmada' : 'Borrador' }}
+                        </span>
+                      </td>
+                      <td (click)="$event.stopPropagation()">
+                        <button class="btn-row-action" [class.btn-row-action--primary]="a.estado === 'BORRADOR'" (click)="abrirMatriz(a)" type="button">
+                          @if (a.estado === 'BORRADOR') {
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            Revisar y ajustar
+                          } @else {
+                            Ver matriz
+                          }
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    } @else {
+      <!-- ══════════════════════ MATRIZ DE UNA CORRIDA ══════════════════════ -->
+      <header class="topbar">
+        <div class="topbar-heading">Corrida de asignación #{{ seleccionada.id }}</div>
+      </header>
+
+      <div class="content">
+        <button class="back-btn" (click)="volverAListado()" type="button">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Volver a corridas
+        </button>
+
+        <!-- Header de corrida -->
+        <div class="run-card">
+          <div class="run-card__head">
+            <div>
+              <div class="run-card__title-row">
+                <span class="run-card__id">Corrida #{{ seleccionada.id }}</span>
+                <span class="status-badge status-badge--big" [class]="'status-badge--' + seleccionada.estado.toLowerCase()">
+                  <span class="status-dot"></span>{{ seleccionada.estado === 'CONFIRMADA' ? 'Confirmada' : 'Borrador' }}
+                </span>
+                @if (seleccionada.generadaAutomaticamente) {
+                  <span class="hamilton-badge">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    Método Hamilton
+                  </span>
+                }
+              </div>
+              <div class="run-card__sub">{{ fmtFechaHora(seleccionada.fechaGeneracion) }} · {{ temporadaNombre(seleccionada.temporadaId) }}</div>
+            </div>
+          </div>
+
+          <div class="run-card__stats">
+            <div class="run-stat">
+              <div class="run-stat__label">Cajas disponibles</div>
+              <div class="run-stat__value run-stat__value--blue">{{ seleccionada.totalCajasDisponibles.toLocaleString('es-CO') }}</div>
+            </div>
+            <div class="run-stat">
+              <div class="run-stat__label">Cajas solicitadas</div>
+              <div class="run-stat__value run-stat__value--amber">{{ seleccionada.totalCajasSolicitadas.toLocaleString('es-CO') }}</div>
+            </div>
+            <div class="run-stat">
+              <div class="run-stat__label">Factor reducción</div>
+              <div class="run-stat__value" [class.run-stat__value--danger]="seleccionada.factorReduccion < 1" [class.run-stat__value--accent]="seleccionada.factorReduccion >= 1">{{ seleccionada.factorReduccion.toFixed(2) }}</div>
+            </div>
+            <div class="run-stat">
+              <div class="run-stat__label">Total asignado</div>
+              <div class="run-stat__value run-stat__value--accent">{{ totalAsignado.toLocaleString('es-CO') }}</div>
+            </div>
+          </div>
+
+          @if (seleccionada.factorReduccion < 1) {
+            <div class="run-card__warning">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              El stock no alcanza para cubrir todo lo solicitado. Se aplicó reducción proporcional del {{ (1 - seleccionada.factorReduccion) * 100 | number: '1.0-0' }}%.
+            </div>
+          }
+        </div>
+
+        <!-- Banner editable / bloqueado -->
+        @if (editable) {
+          <div class="mode-banner mode-banner--editable">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Esta corrida está en <strong>BORRADOR</strong>. Edita las cantidades por celda. Al confirmar, el inventario se descuenta y no se podrá modificar.
+          </div>
+        } @else {
+          <div class="mode-banner mode-banner--locked">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Corrida <strong>CONFIRMADA</strong>. El inventario fue descontado. Solo lectura.
+          </div>
+        }
+
+        <!-- Matriz -->
+        <div class="table-card">
+          <div class="table-card__head table-card__head--row">
+            <span>Matriz de distribución · iglesia × categoría</span>
+            @if (ajustesCount > 0) {
+              <span class="ajustes-note">✏️ {{ ajustesCount }} celda{{ ajustesCount !== 1 ? 's' : '' }} ajustada{{ ajustesCount !== 1 ? 's' : '' }} manualmente</span>
+            }
+          </div>
+          <div class="table-scroll">
+            <table class="matriz-table">
+              <thead>
+                <tr>
+                  <th class="col-iglesia-head">Iglesia</th>
+                  @for (c of columnasCaja; track c.id) {
+                    <th class="col-caja-head">{{ c.desc }}</th>
+                  }
+                  @for (it of columnasItem; track it.id) {
+                    <th class="col-item-head">{{ it.codigo }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (fila of filas; track fila.iglesiaId) {
+                  <tr>
+                    <td class="col-iglesia-cell">{{ fila.nombre }}</td>
+                    @for (c of columnasCaja; track c.id) {
+                      <td class="celda">
+                        @if (editable) {
+                          <input class="celda-input" [class.celda-input--ajustada]="celda(fila, c.id, null)?.ajustadaManualmente"
+                            [class.celda-input--guardando]="guardandoCelda === (fila.iglesiaId + '-c' + c.id)"
+                            type="text" inputmode="numeric" [value]="celda(fila, c.id, null)?.cantidadAsignada ?? 0"
+                            [disabled]="guardandoCelda === (fila.iglesiaId + '-c' + c.id)"
+                            (input)="onCeldaInput($event)" (blur)="onCeldaBlur(fila, c.id, null, $event)"
+                            [attr.aria-label]="'Cantidad de ' + c.desc + ' para ' + fila.nombre" />
+                        } @else {
+                          <span class="celda-readonly" [class.celda-readonly--ajustada]="celda(fila, c.id, null)?.ajustadaManualmente">
+                            {{ (celda(fila, c.id, null)?.cantidadAsignada ?? 0).toLocaleString('es-CO') }}
+                            @if (celda(fila, c.id, null)?.ajustadaManualmente) { <span class="edit-mark">✏️</span> }
+                          </span>
+                        }
+                      </td>
+                    }
+                    @for (it of columnasItem; track it.id) {
+                      <td class="celda celda--item">
+                        @if (editable) {
+                          <input class="celda-input" [class.celda-input--ajustada]="celda(fila, null, it.id)?.ajustadaManualmente"
+                            [class.celda-input--guardando]="guardandoCelda === (fila.iglesiaId + '-i' + it.id)"
+                            type="text" inputmode="numeric" [value]="celda(fila, null, it.id)?.cantidadAsignada ?? 0"
+                            [disabled]="guardandoCelda === (fila.iglesiaId + '-i' + it.id)"
+                            (input)="onCeldaInput($event)" (blur)="onCeldaBlur(fila, null, it.id, $event)"
+                            [attr.aria-label]="'Cantidad de ' + it.codigo + ' para ' + fila.nombre" />
+                        } @else {
+                          <span class="celda-readonly" [class.celda-readonly--ajustada]="celda(fila, null, it.id)?.ajustadaManualmente">
+                            {{ (celda(fila, null, it.id)?.cantidadAsignada ?? 0).toLocaleString('es-CO') }}
+                            @if (celda(fila, null, it.id)?.ajustadaManualmente) { <span class="edit-mark">✏️</span> }
+                          </span>
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (editable) {
+            <div class="table-card__footer">
+              <span class="footer-hint">Revisa la distribución antes de confirmar. La acción descuenta el inventario y es irreversible.</span>
+              <button class="btn-primary" (click)="openConfirmModal()" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Confirmar asignación
+              </button>
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </main>
+
+  <!-- ══════════════════════ MODAL: CONFIRMAR ══════════════════════ -->
+  @if (confirmModalOpen && seleccionada) {
+    <div class="modal-overlay" (click)="closeConfirmModal()">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle" (click)="$event.stopPropagation()">
+        <div class="modal-body">
+          <div class="modal-icon modal-icon--danger">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div>
+            <div class="modal-title" id="confirmModalTitle">¿Confirmar la asignación?</div>
+            <div class="modal-desc">
+              El inventario se descontará según lo asignado en la corrida #{{ seleccionada.id }} y <strong>no podrás hacer más ajustes</strong>. Esta acción no se puede deshacer.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <div class="modal-actions">
+            <button class="btn-cancel" (click)="closeConfirmModal()" type="button" [disabled]="confirmando">Cancelar</button>
+            <button class="btn-confirm btn-confirm--danger" (click)="confirmar()" type="button" [disabled]="confirmando">
+              @if (confirmando) {
+                <span class="spinner-sm"></span> Confirmando…
+              } @else {
+                Sí, confirmar
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</div>
