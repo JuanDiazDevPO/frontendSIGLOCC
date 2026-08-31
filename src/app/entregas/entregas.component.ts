@@ -160,17 +160,31 @@ export class EntregasComponent implements OnInit {
   // ═══════════════════════════════════════════════════════════
   //  Catálogos dependientes de la temporada seleccionada
   // ═══════════════════════════════════════════════════════════
-  iglesias: Iglesia[] = [];
+  private _iglesias: Iglesia[] = [];
   iglesiasLoading = false;
   iglesiasError: string | null = null;
+  private iglesiasById = new Map<number, Iglesia>();
 
-  puntos: PuntoEntrega[] = [];
+  private _puntos: PuntoEntrega[] = [];
   puntosLoading = false;
   puntosError: string | null = null;
+  private puntosById = new Map<number, PuntoEntrega>();
 
   entregas: Entrega[] = [];
   entregasLoading = false;
   entregasError: string | null = null;
+
+  get iglesias(): Iglesia[] { return this._iglesias; }
+  set iglesias(value: Iglesia[]) {
+    this._iglesias = value;
+    this.iglesiasById = new Map(value.map(i => [i.id, i]));
+  }
+
+  get puntos(): PuntoEntrega[] { return this._puntos; }
+  set puntos(value: PuntoEntrega[]) {
+    this._puntos = value;
+    this.puntosById = new Map(value.map(p => [p.id, p]));
+  }
 
   get iglesiasAprobadas(): Iglesia[] {
     return this.iglesias.filter(i => i.estado === 'APROBADA');
@@ -212,9 +226,9 @@ export class EntregasComponent implements OnInit {
       });
   }
 
-  igNombre(id: number): string { return this.iglesias.find(i => i.id === id)?.nombre ?? `Iglesia #${id}`; }
-  igCiudad(id: number): string { return this.iglesias.find(i => i.id === id)?.ciudad ?? ''; }
-  ptNombre(id: number): string { return this.puntos.find(p => p.id === id)?.nombre ?? `Punto #${id}`; }
+  igNombre(id: number): string { return this.iglesiasById.get(id)?.nombre ?? `Iglesia #${id}`; }
+  igCiudad(id: number): string { return this.iglesiasById.get(id)?.ciudad ?? ''; }
+  ptNombre(id: number): string { return this.puntosById.get(id)?.nombre ?? `Punto #${id}`; }
 
   fmtFecha(d: string | null): string {
     if (!d) return '—';
@@ -232,22 +246,45 @@ export class EntregasComponent implements OnInit {
   search = '';
   filtroEstado: EstadoActa | '' = '';
 
+  private filtradasCache: { entregas: Entrega[]; search: string; filtroEstado: EstadoActa | ''; result: Entrega[] } | null = null;
+
   get filtradas(): Entrega[] {
+    if (
+      this.filtradasCache &&
+      this.filtradasCache.entregas === this.entregas &&
+      this.filtradasCache.search === this.search &&
+      this.filtradasCache.filtroEstado === this.filtroEstado
+    ) {
+      return this.filtradasCache.result;
+    }
     const term = this.search.trim().toLowerCase();
-    return this.entregas.filter(e => {
+    const result = this.entregas.filter(e => {
       const matchSearch = !term || `${this.igNombre(e.iglesiaId)} ${this.igCiudad(e.iglesiaId)}`.toLowerCase().includes(term);
       const matchEstado = !this.filtroEstado || e.estado === this.filtroEstado;
       return matchSearch && matchEstado;
     });
+    this.filtradasCache = { entregas: this.entregas, search: this.search, filtroEstado: this.filtroEstado, result };
+    return result;
   }
 
-  get stats() {
+  private statsCache: { entregas: Entrega[]; result: ReturnType<EntregasComponent['computeStats']> } | null = null;
+
+  private computeStats() {
     return {
       total: this.entregas.length,
       completadas: this.entregas.filter(e => e.estado === 'COMPLETADA').length,
       pendientes: this.entregas.filter(e => e.estado === 'PENDIENTE').length,
       items: this.entregas.reduce((s, e) => s + this.totalDetalles(e), 0),
     };
+  }
+
+  get stats() {
+    if (this.statsCache && this.statsCache.entregas === this.entregas) {
+      return this.statsCache.result;
+    }
+    const result = this.computeStats();
+    this.statsCache = { entregas: this.entregas, result };
+    return result;
   }
 
   toggleFiltroEstado(estado: EstadoActa | ''): void {
