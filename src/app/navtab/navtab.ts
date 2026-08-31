@@ -37,7 +37,8 @@ export class Navtab {
     { icon: '🚚', label: 'Entregas',     route: '/entregas' },
     { icon: '💰', label: 'Anticipos',    route: '/anticipos/crear' },
     { icon: '📊', label: 'Presupuestos', route: '/presupuestos/crear' },
-    { icon: '📝', label: 'Reportes',     route: '/reportes/mensual' },
+    { icon: '📝', label: 'Reporte de gastos',  route: '/reportes/mensual' },
+    { icon: '✅', label: 'Gestión de reportes', route: '/reportes/gestion' },
     { icon: '👥', label: 'Usuarios',     route: '/usuarios' },
   ];
 
