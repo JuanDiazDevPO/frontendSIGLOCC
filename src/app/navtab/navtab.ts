@@ -7,6 +7,7 @@ interface NavItem {
   icon: string;
   label: string;
   route: string | null;
+  roles?: string[];
 }
 
 @Component({
@@ -27,9 +28,10 @@ export class Navtab {
     this.router.navigate(['/login']);
   }
 
-  navItems: NavItem[] = [
+  private readonly allNavItems: NavItem[] = [
     { icon: '◈', label: 'Dashboard',    route: '/dashboard' },
     { icon: '⊞', label: 'Temporadas',   route: null },
+    { icon: '⚙', label: 'Parámetros',   route: '/temporadas/parametros', roles: ['ENL_RECURSOS'] },
     { icon: '⛪', label: 'Iglesias',     route: null },
     { icon: '📦', label: 'Asignaciones', route: null },
     { icon: '🚚', label: 'Entregas',     route: null },
@@ -38,6 +40,10 @@ export class Navtab {
     { icon: '📝', label: 'Reportes',     route: '/reportes/mensual' },
     { icon: '👥', label: 'Usuarios',     route: '/usuarios' },
   ];
+
+  get navItems(): NavItem[] {
+    return this.allNavItems.filter(item => !item.roles || item.roles.includes(this.user?.rol ?? ''));
+  }
 
   get initials(): string {
     if (!this.user?.nombreCompleto) return '?';

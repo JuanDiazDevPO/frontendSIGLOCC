@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard } from './auth.guard';
+import { authGuard, guestGuard, roleGuard } from './auth.guard';
 
 export const routes: Routes = [
   {
@@ -41,6 +41,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./crear-presupuesto/crear-presupuesto.component')
         .then(m => m.CrearPresupuestoComponent)
+  },
+  {
+    path: 'temporadas/parametros',
+    canActivate: [authGuard, roleGuard('ENL_RECURSOS')],
+    loadComponent: () =>
+      import('./parametros-temporada/parametros-temporada.component')
+        .then(m => m.ParametrosTemporadaComponent)
   },
   {
     path: 'usuarios',
