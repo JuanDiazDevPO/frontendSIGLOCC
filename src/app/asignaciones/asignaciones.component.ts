@@ -105,7 +105,7 @@ export class AsignacionesComponent implements OnInit {
 
   seleccionarTemporada(idStr: string): void {
     this.temporadaSeleccionada = idStr;
-    this.seleccionada = null;
+    this.setSeleccionada(null);
     if (!idStr) return;
     this.cargarAsignaciones(idStr);
   }
@@ -129,8 +129,18 @@ export class AsignacionesComponent implements OnInit {
       .get<Asignacion[]>(`${environment.apiUrl}/v1/logistica/asignaciones`, { params: { temporadaId } })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: data => { this.asignaciones = data; this.asignacionesLoading = false; this.cdr.detectChanges(); },
-        error: () => { this.asignacionesError = 'No se pudieron cargar las corridas de asignación.'; this.asignacionesLoading = false; this.cdr.detectChanges(); },
+        next: data => {
+          if (this.temporadaSeleccionada !== temporadaId) return; // respuesta obsoleta: el usuario ya cambió de temporada
+          this.asignaciones = data;
+          this.asignacionesLoading = false;
+          this.cdr.detectChanges();
+        },
+        error: () => {
+          if (this.temporadaSeleccionada !== temporadaId) return;
+          this.asignacionesError = 'No se pudieron cargar las corridas de asignación.';
+          this.asignacionesLoading = false;
+          this.cdr.detectChanges();
+        },
       });
   }
 
@@ -168,49 +178,55 @@ export class AsignacionesComponent implements OnInit {
   //  Matriz de una corrida
   // ═══════════════════════════════════════════════════════════
   seleccionada: Asignacion | null = null;
+  columnasCaja: ColumnaCaja[] = [];
+  columnasItem: ColumnaItem[] = [];
+  filas: FilaMatriz[] = [];
   guardandoCelda: string | null = null;
   confirmModalOpen = false;
   confirmando = false;
 
   abrirMatriz(a: Asignacion): void {
-    this.seleccionada = a;
+    this.setSeleccionada(a);
   }
 
   volverAListado(): void {
-    this.seleccionada = null;
+    this.setSeleccionada(null);
   }
 
   get editable(): boolean {
     return this.seleccionada?.estado === 'BORRADOR';
   }
 
-  get columnasCaja(): ColumnaCaja[] {
-    const map = new Map<number, ColumnaCaja>();
-    this.seleccionada?.detalles.forEach(d => {
-      if (d.categoriaCajaId != null && !map.has(d.categoriaCajaId)) {
-        map.set(d.categoriaCajaId, { id: d.categoriaCajaId, codigo: d.codigoCategoria ?? '', desc: d.descripcionCategoria ?? '' });
-      }
-    });
-    return [...map.values()].sort((a, b) => a.id - b.id);
-  }
+  // Recalcula columnas/filas de la matriz una sola vez por asignación, en vez de en cada
+  // ciclo de detección de cambios (evita reconstruir Maps y ordenar por cada tecla/blur).
+  private setSeleccionada(a: Asignacion | null): void {
+    this.seleccionada = a;
 
-  get columnasItem(): ColumnaItem[] {
-    const map = new Map<number, ColumnaItem>();
-    this.seleccionada?.detalles.forEach(d => {
-      if (d.tipoItemId != null && !map.has(d.tipoItemId)) {
-        map.set(d.tipoItemId, { id: d.tipoItemId, codigo: d.codigoItem ?? '' });
-      }
-    });
-    return [...map.values()].sort((a, b) => a.id - b.id);
-  }
+    if (!a) {
+      this.columnasCaja = [];
+      this.columnasItem = [];
+      this.filas = [];
+      return;
+    }
 
-  get filas(): FilaMatriz[] {
-    const map = new Map<number, FilaMatriz>();
-    this.seleccionada?.detalles.forEach(d => {
-      if (!map.has(d.iglesiaId)) map.set(d.iglesiaId, { iglesiaId: d.iglesiaId, nombre: d.nombreIglesia, celdas: new Map() });
-      map.get(d.iglesiaId)!.celdas.set(colKey(d.categoriaCajaId, d.tipoItemId), d);
+    const mapCaja = new Map<number, ColumnaCaja>();
+    const mapItem = new Map<number, ColumnaItem>();
+    const mapFilas = new Map<number, FilaMatriz>();
+
+    a.detalles.forEach(d => {
+      if (d.categoriaCajaId != null && !mapCaja.has(d.categoriaCajaId)) {
+        mapCaja.set(d.categoriaCajaId, { id: d.categoriaCajaId, codigo: d.codigoCategoria ?? '', desc: d.descripcionCategoria ?? '' });
+      }
+      if (d.tipoItemId != null && !mapItem.has(d.tipoItemId)) {
+        mapItem.set(d.tipoItemId, { id: d.tipoItemId, codigo: d.codigoItem ?? '' });
+      }
+      if (!mapFilas.has(d.iglesiaId)) mapFilas.set(d.iglesiaId, { iglesiaId: d.iglesiaId, nombre: d.nombreIglesia, celdas: new Map() });
+      mapFilas.get(d.iglesiaId)!.celdas.set(colKey(d.categoriaCajaId, d.tipoItemId), d);
     });
-    return [...map.values()];
+
+    this.columnasCaja = [...mapCaja.values()].sort((x, y) => x.id - y.id);
+    this.columnasItem = [...mapItem.values()].sort((x, y) => x.id - y.id);
+    this.filas = [...mapFilas.values()];
   }
 
   celda(fila: FilaMatriz, categoriaCajaId: number | null, tipoItemId: number | null): AsignacionDetalle | undefined {
@@ -252,7 +268,7 @@ export class AsignacionesComponent implements OnInit {
       .subscribe({
         next: res => {
           this.guardandoCelda = null;
-          this.seleccionada = res;
+          this.setSeleccionada(res);
           this.asignaciones = this.asignaciones.map(a => (a.id === id ? res : a));
           this.cdr.detectChanges();
         },
@@ -285,7 +301,7 @@ export class AsignacionesComponent implements OnInit {
         next: res => {
           this.confirmando = false;
           this.confirmModalOpen = false;
-          this.seleccionada = res;
+          this.setSeleccionada(res);
           this.asignaciones = this.asignaciones.map(a => (a.id === id ? res : a));
           this.alert.success(`Corrida #${id} confirmada · inventario descontado.`);
           this.cdr.detectChanges();
