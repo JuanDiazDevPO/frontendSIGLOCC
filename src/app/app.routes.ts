@@ -37,7 +37,7 @@ export const routes: Routes = [
   },
   {
     path: 'presupuestos/crear',
-    canActivate: [authGuard],
+    canActivate: [authGuard, roleGuard('ENL_RECURSOS')],
     loadComponent: () =>
       import('./crear-presupuesto/crear-presupuesto.component')
         .then(m => m.CrearPresupuestoComponent)

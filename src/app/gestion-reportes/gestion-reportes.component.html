@@ -20,6 +20,18 @@
           @if (temporadasError) { <span class="field-error">⚠ {{ temporadasError }}</span> }
         </div>
       </div>
+      @if (isDev) {
+        <div class="topbar-dev">
+          <label class="field-label-inline" for="rolDevSelect">👁 Ver como (solo dev)</label>
+          <select id="rolDevSelect" class="form-input form-select form-select--sm"
+            [ngModel]="rolOverride" (ngModelChange)="setRolOverride($event)" name="rolDevSelect">
+            <option value="">Mi rol real</option>
+            <option value="ERL">ERL</option>
+            <option value="ERLE">ERLE</option>
+            <option value="ENL">ENL</option>
+          </select>
+        </div>
+      }
     </header>
 
     <div class="content">
@@ -124,6 +136,10 @@
             <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'RECHAZADO'" (click)="setFiltro('RECHAZADO')" type="button">Rechazados</button>
           } @else {
             <button class="filter-tab" [class.filter-tab--hl]="filtroEstado === 'pendientes_mios'" [class.filter-tab--active]="filtroEstado === 'pendientes_mios'" (click)="setFiltro('pendientes_mios')" type="button">Mi bandeja ({{ kpiRevisor.pendientesMios }})</button>
+            <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'BORRADOR'" (click)="setFiltro('BORRADOR')" type="button">
+              Pendientes por doc
+              @if (kpiRevisor.pendientesPorDoc > 0) { <span class="filter-tab__count">{{ kpiRevisor.pendientesPorDoc }}</span> }
+            </button>
             <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'todos'" (click)="setFiltro('todos')" type="button">Todos</button>
             <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'PENDIENTE_ERLE'" (click)="setFiltro('PENDIENTE_ERLE')" type="button">Pend. ERLE</button>
             <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'PENDIENTE_ENL'" (click)="setFiltro('PENDIENTE_ENL')" type="button">Pend. ENL</button>
@@ -134,7 +150,7 @@
         <div class="search-wrap">
           <label class="sr-only" for="reportesSearch">Buscar por equipo, período o ID</label>
           <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input id="reportesSearch" class="search-input" [(ngModel)]="search" name="search" type="text" placeholder="Buscar por equipo, período o ID…" />
+          <input id="reportesSearch" class="search-input" [ngModel]="search" (ngModelChange)="onSearchChange($event)" name="search" type="text" placeholder="Buscar por equipo, período o ID…" />
         </div>
         <span class="result-count">{{ filtrados.length }} resultado{{ filtrados.length !== 1 ? 's' : '' }}</span>
       </div>
@@ -166,8 +182,11 @@
                   </td>
                 </tr>
               } @else {
-                @for (r of filtrados; track r.id) {
-                  <tr class="reporte-row" [class.reporte-row--accion]="puedeActuar(r)" [class.reporte-row--editar]="erlPuedeEditar(r)"
+                @for (r of filtradosPagina; track r.id) {
+                  <tr class="reporte-row"
+                    [class.reporte-row--accion-erle]="puedeActuar(r) && rolScope === 'ERLE'"
+                    [class.reporte-row--accion-enl]="puedeActuar(r) && rolScope === 'ENL'"
+                    [class.reporte-row--editar]="puedeSubirSoporte(r) || puedeCorregir(r)"
                     (click)="abrirDetalle(r)" role="button" tabindex="0" (keydown.enter)="abrirDetalle(r)">
                     <td class="col-id">#{{ r.id }}</td>
                     <td>
@@ -194,16 +213,17 @@
                     <td class="col-acciones" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
                       @if (puedeActuar(r)) {
                         <div class="row-actions">
-                          <button class="btn-row-reject" (click)="openAccionModal(r, 'rechazar')" type="button" aria-label="Rechazar reporte">
+                          <button class="btn-row-reject" (click)="openAccionModal(r, 'rechazar')" type="button" aria-label="Rechazar reporte" title="Rechazar reporte">
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                           </button>
-                          <button class="btn-row-approve" (click)="openAccionModal(r, 'aprobar')" type="button">
+                          <button class="btn-row-approve" (click)="openAccionModal(r, 'aprobar')" type="button" aria-label="Aprobar reporte" title="Aprobar reporte">
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                             Aprobar
                           </button>
                         </div>
-                      } @else if (erlPuedeEditar(r)) {
-                        <button class="btn-row-edit" [class.btn-row-edit--danger]="r.estado === 'RECHAZADO'" (click)="r.estado === 'RECHAZADO' ? openErlModal(r, 'corregir') : openErlModal(r, 'soporte')" type="button">
+                      } @else if (puedeSubirSoporte(r) || puedeCorregir(r)) {
+                        <button class="btn-row-edit" [class.btn-row-edit--danger]="r.estado === 'RECHAZADO'" (click)="r.estado === 'RECHAZADO' ? openErlModal(r, 'corregir') : openErlModal(r, 'soporte')" type="button"
+                          [attr.aria-label]="r.estado === 'RECHAZADO' ? 'Corregir reporte' : 'Subir soporte'" [attr.title]="r.estado === 'RECHAZADO' ? 'Corregir reporte' : 'Subir soporte'">
                           @if (r.estado === 'RECHAZADO') {
                             ✏️ Corregir
                           } @else {
@@ -211,7 +231,7 @@
                           }
                         </button>
                       } @else {
-                        <button class="btn-row-view" (click)="abrirDetalle(r)" type="button">Ver detalle</button>
+                        <button class="btn-row-view" (click)="abrirDetalle(r)" type="button" aria-label="Ver detalle del reporte" title="Ver detalle del reporte">Ver detalle</button>
                       }
                     </td>
                   </tr>
@@ -220,6 +240,13 @@
             </tbody>
           </table>
         </div>
+        @if (filtrados.length > PAGE_SIZE) {
+          <div class="pagination-bar">
+            <button class="btn-outline-sm" type="button" [disabled]="paginaActual === 1" (click)="irAPagina(-1)" title="Página anterior">‹ Anterior</button>
+            <span class="pagination-info">Página {{ paginaActual }} de {{ totalPaginas }}</span>
+            <button class="btn-outline-sm" type="button" [disabled]="paginaActual === totalPaginas" (click)="irAPagina(1)" title="Página siguiente">Siguiente ›</button>
+          </div>
+        }
       </div>
     </div>
   </main>
@@ -230,7 +257,7 @@
       (click)="$event.target === $event.currentTarget && cerrarDetalle()"
       (keydown.enter)="$event.target === $event.currentTarget && cerrarDetalle()"
       (keydown.escape)="cerrarDetalle()">
-      <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="detalleTitle">
+      <div class="drawer" id="detalleDialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="detalleTitle">
         <div class="drawer-header">
           <div>
             <div class="detalle-heading">
@@ -245,7 +272,7 @@
               {{ equipoNombre(seleccionado.equipoId) }}
             </div>
           </div>
-          <button class="icon-btn" (click)="cerrarDetalle()" type="button" aria-label="Cerrar">
+          <button class="icon-btn" (click)="cerrarDetalle()" type="button" aria-label="Cerrar" title="Cerrar">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -296,7 +323,10 @@
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                 </div>
                 <div class="soporte-box__name">{{ seleccionado.urlSoporte }}</div>
-                <a class="btn-outline-sm" [href]="soporteUrl(seleccionado.urlSoporte)" target="_blank" rel="noopener">Ver</a>
+                <div class="soporte-box__actions">
+                  <a class="btn-outline-sm" [href]="soporteUrl(seleccionado.urlSoporte)" target="_blank" rel="noopener" title="Ver soporte en una nueva pestaña">Ver</a>
+                  <a class="btn-outline-sm" [href]="soporteUrl(seleccionado.urlSoporte)" download target="_blank" rel="noopener" title="Descargar archivo de soporte">Descargar</a>
+                </div>
               </div>
             } @else {
               <div class="soporte-empty">Sin soporte adjunto</div>
@@ -372,23 +402,23 @@
         <!-- Footer acciones -->
         <div class="drawer-footer">
           @if (puedeActuar(seleccionado)) {
-            <button class="btn-outline-danger" (click)="openAccionModal(seleccionado, 'rechazar')" type="button">
+            <button class="btn-outline-danger" (click)="openAccionModal(seleccionado, 'rechazar')" type="button" title="Rechazar reporte">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               Rechazar
             </button>
-            <button class="btn-confirm btn-confirm--wide" (click)="openAccionModal(seleccionado, 'aprobar')" type="button">
+            <button class="btn-confirm btn-confirm--wide" (click)="openAccionModal(seleccionado, 'aprobar')" type="button" title="Aprobar reporte">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               {{ rolScope === 'ENL' ? 'Aprobar (final)' : 'Aprobar y enviar a ENL' }}
             </button>
-          } @else if (erlPuedeEditar(seleccionado) && seleccionado.estado === 'BORRADOR') {
+          } @else if (puedeSubirSoporte(seleccionado)) {
             <div class="footer-note">
               <div class="footer-note__text"><strong>Borrador.</strong> Adjunta el archivo de soporte (PDF/ZIP) para enviar el reporte a revisión del ERLE.</div>
-              <button class="btn-confirm" (click)="openErlModal(seleccionado, 'soporte')" type="button">📎 Subir soporte y enviar a ERLE</button>
+              <button class="btn-confirm" (click)="openErlModal(seleccionado, 'soporte')" type="button" title="Subir soporte y enviar a ERLE">📎 Subir soporte y enviar a ERLE</button>
             </div>
-          } @else if (erlPuedeEditar(seleccionado) && seleccionado.estado === 'RECHAZADO') {
+          } @else if (puedeCorregir(seleccionado)) {
             <div class="footer-note">
               <div class="footer-note__text footer-note__text--danger"><strong>Reporte rechazado.</strong> Corrige los rubros según las observaciones y reenvía. El reporte volverá a BORRADOR y deberás subir un soporte actualizado.</div>
-              <button class="btn-confirm btn-confirm--danger" (click)="openErlModal(seleccionado, 'corregir')" type="button">✏️ Corregir rubros y reenviar</button>
+              <button class="btn-confirm btn-confirm--danger" (click)="openErlModal(seleccionado, 'corregir')" type="button" title="Corregir rubros y reenviar">✏️ Corregir rubros y reenviar</button>
             </div>
           } @else {
             <div class="info-note">ℹ️ {{ motivoNoAccion(seleccionado) }}</div>
@@ -404,7 +434,7 @@
       (click)="$event.target === $event.currentTarget && closeAccionModal()"
       (keydown.enter)="$event.target === $event.currentTarget && closeAccionModal()"
       (keydown.escape)="closeAccionModal()">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="accionModalTitle">
+      <div class="modal" id="accionModalDialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="accionModalTitle">
         <div class="modal-body">
           <div class="modal-icon" [class.modal-icon--danger]="accionTarget.accion === 'rechazar'">
             @if (accionTarget.accion === 'aprobar') {
@@ -466,10 +496,11 @@
 
         <div class="modal-footer">
           <div class="modal-actions">
-            <button class="btn-cancel" (click)="closeAccionModal()" type="button" [disabled]="accionLoading">Cancelar</button>
+            <button class="btn-cancel" (click)="closeAccionModal()" type="button" [disabled]="accionLoading" title="Cancelar">Cancelar</button>
             <button class="btn-confirm" [class.btn-confirm--danger]="accionTarget.accion === 'rechazar'"
               [disabled]="accionLoading || (accionTarget.accion === 'rechazar' && !accionRechazoValido)"
-              (click)="submitAccion()" type="button">
+              (click)="submitAccion()" type="button"
+              [attr.title]="accionTarget.accion === 'aprobar' ? 'Aprobar reporte' : 'Rechazar reporte'">
               @if (accionLoading) {
                 <span class="spinner-sm"></span> Procesando…
               } @else if (accionTarget.accion === 'aprobar') {
@@ -490,7 +521,7 @@
       (click)="$event.target === $event.currentTarget && closeErlModal()"
       (keydown.enter)="$event.target === $event.currentTarget && closeErlModal()"
       (keydown.escape)="closeErlModal()">
-      <div class="modal" [class.modal--wide]="erlAccion.accion === 'corregir'" role="dialog" aria-modal="true" aria-labelledby="erlModalTitle">
+      <div class="modal" id="erlModalDialog" tabindex="-1" [class.modal--wide]="erlAccion.accion === 'corregir'" role="dialog" aria-modal="true" aria-labelledby="erlModalTitle">
         <div class="modal-body">
           <div class="modal-icon">{{ erlAccion.accion === 'soporte' ? '📎' : '✏️' }}</div>
           <div>
@@ -537,11 +568,16 @@
                 <div class="correccion-row">
                   <code class="rubro-code" [class]="'rubro-code--' + d.familia.toLowerCase()">{{ d.categoriaCodigo }}</code>
                   <span class="correccion-row__nombre">{{ d.nombreCategoria }}</span>
-                  <div class="correccion-input-wrap">
-                    <span class="correccion-input-prefix">$</span>
-                    <label class="sr-only" [attr.for]="'monto-' + d.categoriaCodigo">Monto para {{ d.nombreCategoria }}</label>
-                    <input [id]="'monto-' + d.categoriaCodigo" class="correccion-input" type="number" min="0"
-                      [(ngModel)]="montosCorreccion[d.categoriaCodigo]" [name]="'monto-' + d.categoriaCodigo" />
+                  <div class="correccion-input-col">
+                    <div class="correccion-input-wrap" [class.correccion-input-wrap--error]="montoInvalido(d.categoriaCodigo)">
+                      <span class="correccion-input-prefix">$</span>
+                      <label class="sr-only" [attr.for]="'monto-' + d.categoriaCodigo">Monto para {{ d.nombreCategoria }}</label>
+                      <input [id]="'monto-' + d.categoriaCodigo" class="correccion-input" type="number" min="0"
+                        [(ngModel)]="montosCorreccion[d.categoriaCodigo]" [name]="'monto-' + d.categoriaCodigo" />
+                    </div>
+                    @if (montoInvalido(d.categoriaCodigo)) {
+                      <span class="field-error field-error--sm">El monto no puede ser negativo</span>
+                    }
                   </div>
                 </div>
               }
@@ -562,9 +598,13 @@
         </div>
 
         <div class="modal-footer">
+          @if (erlAccion.accion === 'corregir' && correccionTieneMontoInvalido) {
+            <div class="field-error">⚠ Corrige los montos negativos antes de guardar.</div>
+          }
           <div class="modal-actions">
-            <button class="btn-cancel" (click)="closeErlModal()" type="button" [disabled]="erlLoading">Cancelar</button>
-            <button class="btn-confirm" [disabled]="erlLoading || (erlAccion.accion === 'soporte' ? !soporteFile : totalCorregido <= 0)" (click)="submitErlAccion()" type="button">
+            <button class="btn-cancel" (click)="closeErlModal()" type="button" [disabled]="erlLoading" title="Cancelar">Cancelar</button>
+            <button class="btn-confirm" [disabled]="erlLoading || (erlAccion.accion === 'soporte' ? !soporteFile : (totalCorregido <= 0 || correccionTieneMontoInvalido))" (click)="submitErlAccion()" type="button"
+              [attr.title]="erlAccion.accion === 'soporte' ? 'Subir soporte' : 'Guardar corrección'">
               @if (erlLoading) {
                 <span class="spinner-sm"></span> Procesando…
               } @else if (erlAccion.accion === 'soporte') {

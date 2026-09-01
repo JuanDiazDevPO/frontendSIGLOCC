@@ -2,11 +2,19 @@
   @for (alert of alertService.alerts(); track alert.id) {
     <div class="alert alert--{{ alert.type }}">
       <span class="alert__message">{{ alert.message }}</span>
+      @if (alert.action) {
+        <button
+          class="alert__action"
+          type="button"
+          (click)="runAction(alert)"
+        >{{ alert.action.label }}</button>
+      }
       <button
         class="alert__close"
         type="button"
         (click)="alertService.dismiss(alert.id)"
         aria-label="Cerrar"
+        title="Cerrar"
       >&#x2715;</button>
     </div>
   }

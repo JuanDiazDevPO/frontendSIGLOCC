@@ -8,8 +8,10 @@
   </div>
 
   <nav class="sidebar-nav">
-    @for (item of navItems; track item.label) {
-      @if (item.route) {
+    @for (item of navItems; track item.section ?? item.label) {
+      @if (item.section) {
+        <div class="nav-section">{{ item.section }}</div>
+      } @else if (item.route) {
         <a [routerLink]="item.route" routerLinkActive="active" class="nav-item">
           <span class="nav-icon">{{ item.icon }}</span>
           {{ item.label }}
