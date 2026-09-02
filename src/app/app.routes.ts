@@ -71,6 +71,13 @@ export const routes: Routes = [
         .then(m => m.EntregasComponent)
   },
   {
+    path: 'capacitaciones',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./capacitaciones/capacitaciones.component')
+        .then(m => m.CapacitacionesComponent)
+  },
+  {
     path: 'usuarios',
     canActivate: [authGuard, roleGuard('ENL_RECURSOS', 'ENL_LOGISTICA', 'ADMIN')],
     loadComponent: () =>
