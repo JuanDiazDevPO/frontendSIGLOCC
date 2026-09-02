@@ -36,8 +36,8 @@ function rolArea(rol: string): Area | '' {
 export class Navtab {
   @Input() user: Usuario | null = null;
 
-  private auth = inject(AuthService);
-  private router = inject(Router);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
 
   signOut() {
     this.auth.logout();
@@ -70,6 +70,9 @@ export class Navtab {
     { icon: '🚚', label: 'Entregas',     route: '/entregas',     area: 'LOGISTICA' },
   ];
 
+  // Un solo módulo visible según el área del rol (RECURSOS vs LOGISTICA);
+  // los ítems de Administración usan `roles` (CORE_ROLES) en vez de `area`,
+  // ya que ese módulo es transversal a ambas áreas.
   get navItems(): NavItem[] {
     const rol = this.user?.rol ?? '';
     const area = rolArea(rol);
