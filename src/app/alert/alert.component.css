@@ -34,8 +34,30 @@
   color: #ffffff;
 }
 
+.alert--info {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
 .alert__message {
   flex: 1;
+}
+
+.alert__action {
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-sm, 4px);
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  padding: 2px 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.alert__action:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .alert__close {

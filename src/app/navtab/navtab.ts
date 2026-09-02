@@ -3,11 +3,23 @@ import { RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { Usuario } from '../auth.models';
 import { AuthService } from '../auth.service';
 
+type Area = 'RECURSOS' | 'LOGISTICA';
+
 interface NavItem {
-  icon: string;
-  label: string;
-  route: string | null;
+  icon?: string;
+  label?: string;
+  route?: string | null;
   roles?: string[];
+  area?: Area;
+  section?: string;
+}
+
+// US-SEC-002 / CA1: el rol determina un único módulo funcional visible.
+// _RECURSOS ve solo Gestión Financiera; _LOGISTICA ve solo Gestión Logística.
+function rolArea(rol: string): Area | '' {
+  if (rol.includes('LOGISTICA')) return 'LOGISTICA';
+  if (rol.includes('RECURSOS')) return 'RECURSOS';
+  return '';
 }
 
 @Component({
@@ -29,21 +41,35 @@ export class Navtab {
   }
 
   private readonly allNavItems: NavItem[] = [
-    { icon: '◈', label: 'Dashboard',    route: '/dashboard' },
-    { icon: '⊞', label: 'Temporadas',   route: null },
-    { icon: '⚙', label: 'Parámetros',   route: '/temporadas/parametros', roles: ['ENL_RECURSOS'] },
-    { icon: '⛪', label: 'Iglesias',     route: '/iglesias' },
-    { icon: '📦', label: 'Asignaciones', route: '/asignaciones' },
-    { icon: '🚚', label: 'Entregas',     route: '/entregas' },
-    { icon: '💰', label: 'Anticipos',    route: '/anticipos/crear' },
-    { icon: '📊', label: 'Presupuestos', route: '/presupuestos/crear' },
-    { icon: '📝', label: 'Reporte de gastos',  route: '/reportes/mensual' },
-    { icon: '✅', label: 'Gestión de reportes', route: '/reportes/gestion' },
-    { icon: '👥', label: 'Usuarios',     route: '/usuarios' },
+    { icon: '◈', label: 'Dashboard', route: '/dashboard' },
+
+    { section: 'Gestión Financiera', area: 'RECURSOS' },
+    { icon: '⊞', label: 'Temporadas',   route: null,                      area: 'RECURSOS' },
+    { icon: '⚙', label: 'Parámetros',   route: '/temporadas/parametros',  roles: ['ENL_RECURSOS'] },
+    { icon: '💰', label: 'Anticipos',    route: '/anticipos/crear',        area: 'RECURSOS' },
+    { icon: '📊', label: 'Presupuestos', route: '/presupuestos/crear',     roles: ['ENL_RECURSOS'] },
+    { icon: '📝', label: 'Reporte de gastos',   route: '/reportes/mensual', area: 'RECURSOS' },
+    { icon: '✅', label: 'Gestión de reportes', route: '/reportes/gestion', area: 'RECURSOS' },
+
+    { section: 'Gestión Logística', area: 'LOGISTICA' },
+    { icon: '⛪', label: 'Iglesias',     route: '/iglesias',     area: 'LOGISTICA' },
+    { icon: '📦', label: 'Asignaciones', route: '/asignaciones', area: 'LOGISTICA' },
+    { icon: '🚚', label: 'Entregas',     route: '/entregas',     area: 'LOGISTICA' },
+
+    { icon: '👥', label: 'Usuarios', route: '/usuarios' },
   ];
 
+  // CA1: un solo módulo visible según el área del rol (RECURSOS vs LOGISTICA);
+  // los ítems sin `area` (Dashboard, Usuarios) son de Core y siempre se muestran.
+  // `roles` sigue permitiendo restringir además por nivel jerárquico (ENL/ERLE/ERL).
   get navItems(): NavItem[] {
-    return this.allNavItems.filter(item => !item.roles || item.roles.includes(this.user?.rol ?? ''));
+    const rol = this.user?.rol ?? '';
+    const area = rolArea(rol);
+    return this.allNavItems.filter(item => {
+      if (item.area && item.area !== area) return false;
+      if (item.roles && !item.roles.includes(rol)) return false;
+      return true;
+    });
   }
 
   get initials(): string {

@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { AlertService } from '../alert.service';
+import { Alert, AlertService } from '../alert.service';
 
 @Component({
   selector: 'app-alert',
@@ -9,4 +9,9 @@ import { AlertService } from '../alert.service';
 })
 export class AlertComponent {
   protected alertService = inject(AlertService);
+
+  runAction(alert: Alert) {
+    alert.action?.onClick();
+    this.alertService.dismiss(alert.id);
+  }
 }

@@ -69,6 +69,13 @@ const MAX_SOPORTE_BYTES = 20 * 1024 * 1024;
 
 const FLUJO_STEPS: EstadoReporte[] = ['BORRADOR', 'PENDIENTE_ERLE', 'PENDIENTE_ENL', 'APROBADO'];
 const FAMILIAS: Familia[] = ['E', 'M', 'O'];
+const PAGE_SIZE = 50;
+const FILTROS_STORAGE_KEY = 'gestion_reportes_filtros';
+
+interface FiltrosPersistidos {
+  filtroEstado?: FiltroEstado;
+  search?: string;
+}
 
 function rolScopeDe(rol: string | undefined): RolScope {
   if (!rol) return '';
@@ -97,9 +104,44 @@ export class GestionReportesComponent implements OnInit {
   readonly ESTADO_LABEL = ESTADO_LABEL;
   readonly FLUJO_STEPS = FLUJO_STEPS;
   readonly FAMILIAS = FAMILIAS;
+  readonly PAGE_SIZE = PAGE_SIZE;
 
   user: Usuario | null = this.session.getUser();
-  readonly rolScope: RolScope = rolScopeDe(this.session.getUser()?.rol);
+  private readonly rolScopeReal: RolScope = rolScopeDe(this.session.getUser()?.rol);
+
+  // Selector de rol: solo disponible fuera de producción, para QA/demo.
+  // El rol real en producción siempre se deriva de la sesión del usuario.
+  readonly isDev = !environment.production;
+  rolOverride: RolScope | '' = '';
+
+  get rolScope(): RolScope {
+    return this.isDev && this.rolOverride ? this.rolOverride : this.rolScopeReal;
+  }
+
+  setRolOverride(valor: string): void {
+    if (!this.isDev) return;
+    this.rolOverride = valor as RolScope | '';
+    this.filtroEstado = this.rolScope === 'ERL' ? 'todos' : 'pendientes_mios';
+    this.paginaActual = 1;
+    this.seleccionado = null;
+  }
+
+  private lastFocusedBeforeModal: HTMLElement | null = null;
+
+  private restoreFocus(): void {
+    this.lastFocusedBeforeModal?.focus();
+    this.lastFocusedBeforeModal = null;
+  }
+
+  @HostListener('document:focusin', ['$event'])
+  onFocusIn(event: FocusEvent): void {
+    const dialogId = this.accionTarget ? 'accionModalDialog' : this.erlAccion ? 'erlModalDialog' : this.seleccionado ? 'detalleDialog' : null;
+    if (!dialogId) return;
+    const dialog = document.getElementById(dialogId);
+    if (dialog && event.target instanceof Node && !dialog.contains(event.target)) {
+      dialog.focus();
+    }
+  }
 
   @HostListener('document:keydown.escape')
   onEscapeKey(): void {
@@ -122,7 +164,32 @@ export class GestionReportesComponent implements OnInit {
   reportesLoading = false;
   reportesError: string | null = null;
 
+  private filtrosIniciales: FiltrosPersistidos | null = null;
+
+  private cargarFiltrosPersistidos(): FiltrosPersistidos {
+    try {
+      const raw = sessionStorage.getItem(FILTROS_STORAGE_KEY);
+      return raw ? JSON.parse(raw) as FiltrosPersistidos : {};
+    } catch {
+      return {};
+    }
+  }
+
+  private persistirFiltros(): void {
+    try {
+      sessionStorage.setItem(FILTROS_STORAGE_KEY, JSON.stringify({
+        filtroEstado: this.filtroEstado,
+        search: this.search,
+      }));
+    } catch {
+      // sessionStorage no disponible (modo privado, cuota excedida, etc.)
+    }
+  }
+
   ngOnInit(): void {
+    this.filtrosIniciales = this.cargarFiltrosPersistidos();
+    if (this.filtrosIniciales.search) this.search = this.filtrosIniciales.search;
+
     this.http
       .get<Equipo[]>(`${environment.apiUrl}/usuarios/equipos`)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -153,7 +220,9 @@ export class GestionReportesComponent implements OnInit {
 
   seleccionarTemporada(idStr: string): void {
     this.temporadaSeleccionada = idStr;
-    this.filtroEstado = this.rolScope === 'ERL' ? 'todos' : 'pendientes_mios';
+    this.filtroEstado = this.filtrosIniciales?.filtroEstado ?? (this.rolScope === 'ERL' ? 'todos' : 'pendientes_mios');
+    this.filtrosIniciales = null;
+    this.paginaActual = 1;
     this.seleccionado = null;
     if (!idStr) return;
     this.cargarReportes(idStr);
@@ -209,6 +278,7 @@ export class GestionReportesComponent implements OnInit {
   // ═══════════════════════════════════════════════════════════
   search = '';
   filtroEstado: FiltroEstado = 'pendientes_mios';
+  paginaActual = 1;
 
   private get estadoPendienteMio(): EstadoReporte | null {
     if (this.rolScope === 'ERLE') return 'PENDIENTE_ERLE';
@@ -216,9 +286,19 @@ export class GestionReportesComponent implements OnInit {
     return null;
   }
 
+  // El ERL solo debe ver los reportes de su propio equipo. ERLE/ENL revisan
+  // equipos subordinados (clúster/nacional), por lo que su equipoId nunca
+  // coincide con el de los reportes que aprueban — este filtro no aplica ahí.
+  private get reportesVisibles(): Reporte[] {
+    if (this.rolScope === 'ERL') {
+      return this.reportes.filter(r => r.equipoId === this.user?.equipoId);
+    }
+    return this.reportes;
+  }
+
   get filtrados(): Reporte[] {
     const term = this.search.trim().toLowerCase();
-    return this.reportes.filter(r => {
+    return this.reportesVisibles.filter(r => {
       const texto = `${this.equipoNombre(r.equipoId)} ${MESES[r.mes - 1]} ${r.anio} #${r.id}`.toLowerCase();
       if (term && !texto.includes(term)) return false;
       if (this.filtroEstado === 'todos') return true;
@@ -228,14 +308,28 @@ export class GestionReportesComponent implements OnInit {
     });
   }
 
+  get totalPaginas(): number {
+    return Math.max(1, Math.ceil(this.filtrados.length / this.PAGE_SIZE));
+  }
+
+  get filtradosPagina(): Reporte[] {
+    const inicio = (this.paginaActual - 1) * this.PAGE_SIZE;
+    return this.filtrados.slice(inicio, inicio + this.PAGE_SIZE);
+  }
+
+  irAPagina(delta: number): void {
+    this.paginaActual = Math.min(Math.max(1, this.paginaActual + delta), this.totalPaginas);
+  }
+
   get kpiErl() {
-    const borradores = this.reportes.filter(r => r.estado === 'BORRADOR').length;
-    const rechazados = this.reportes.filter(r => r.estado === 'RECHAZADO').length;
+    const propios = this.reportesVisibles;
+    const borradores = propios.filter(r => r.estado === 'BORRADOR').length;
+    const rechazados = propios.filter(r => r.estado === 'RECHAZADO').length;
     return {
       requierenAccion: borradores + rechazados,
       borradores,
-      enRevision: this.reportes.filter(r => r.estado === 'PENDIENTE_ERLE' || r.estado === 'PENDIENTE_ENL').length,
-      aprobados: this.reportes.filter(r => r.estado === 'APROBADO').length,
+      enRevision: propios.filter(r => r.estado === 'PENDIENTE_ERLE' || r.estado === 'PENDIENTE_ENL').length,
+      aprobados: propios.filter(r => r.estado === 'APROBADO').length,
     };
   }
 
@@ -246,11 +340,20 @@ export class GestionReportesComponent implements OnInit {
       montoPorAprobar: pendientesMios.reduce((s, r) => s + r.montoTotal, 0),
       aprobados: this.reportes.filter(r => r.estado === 'APROBADO').length,
       rechazados: this.reportes.filter(r => r.estado === 'RECHAZADO').length,
+      pendientesPorDoc: this.reportes.filter(r => r.estado === 'BORRADOR').length,
     };
   }
 
   setFiltro(f: FiltroEstado): void {
     this.filtroEstado = f;
+    this.paginaActual = 1;
+    this.persistirFiltros();
+  }
+
+  onSearchChange(valor: string): void {
+    this.search = valor;
+    this.paginaActual = 1;
+    this.persistirFiltros();
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -261,9 +364,15 @@ export class GestionReportesComponent implements OnInit {
       || (this.rolScope === 'ENL' && r.estado === 'PENDIENTE_ENL');
   }
 
-  erlPuedeEditar(r: Reporte): boolean {
-    return this.rolScope === 'ERL' && r.equipoId === this.user?.equipoId
-      && (r.estado === 'BORRADOR' || r.estado === 'RECHAZADO');
+  // Subir soporte a un reporte en BORRADOR está disponible para cualquier rol
+  // que pueda ver el reporte (la visibilidad ya la resuelve el backend/rolScope).
+  puedeSubirSoporte(r: Reporte): boolean {
+    return r.estado === 'BORRADOR';
+  }
+
+  // Corregir un reporte RECHAZADO sigue siendo exclusivo del ERL dueño del equipo.
+  puedeCorregir(r: Reporte): boolean {
+    return this.rolScope === 'ERL' && r.equipoId === this.user?.equipoId && r.estado === 'RECHAZADO';
   }
 
   motivoNoAccion(r: Reporte): string {
@@ -289,11 +398,14 @@ export class GestionReportesComponent implements OnInit {
   seleccionado: Reporte | null = null;
 
   abrirDetalle(r: Reporte): void {
+    this.lastFocusedBeforeModal = document.activeElement as HTMLElement;
     this.seleccionado = r;
+    setTimeout(() => document.getElementById('detalleDialog')?.focus());
   }
 
   cerrarDetalle(): void {
     this.seleccionado = null;
+    this.restoreFocus();
   }
 
   private actualizarReporteLocal(res: Reporte): void {
@@ -346,13 +458,16 @@ export class GestionReportesComponent implements OnInit {
   }
 
   openAccionModal(reporte: Reporte, accion: 'aprobar' | 'rechazar'): void {
+    this.lastFocusedBeforeModal = document.activeElement as HTMLElement;
     this.accionTarget = { reporte, accion };
     this.accionObservaciones = '';
+    setTimeout(() => document.getElementById('accionModalDialog')?.focus());
   }
 
   closeAccionModal(): void {
     if (this.accionLoading) return;
     this.accionTarget = null;
+    this.restoreFocus();
   }
 
   submitAccion(): void {
@@ -374,15 +489,18 @@ export class GestionReportesComponent implements OnInit {
           this.accionLoading = false;
           this.actualizarReporteLocal(res);
           this.accionTarget = null;
+          this.restoreFocus();
           if (this.seleccionado?.id === res.id) this.seleccionado = null;
-          this.alert.success(nuevoEstado === 'RECHAZADO'
-            ? `Reporte #${reporte.id} rechazado.`
-            : `Reporte #${reporte.id} → ${ESTADO_LABEL[nuevoEstado]}.`);
+          if (nuevoEstado === 'RECHAZADO') {
+            this.alert.error(`Reporte #${reporte.id} rechazado.`);
+          } else {
+            this.alert.success(`Reporte #${reporte.id} → ${ESTADO_LABEL[nuevoEstado]}.`);
+          }
           this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.accionLoading = false;
-          this.alert.error(this.httpErrorMessage(err));
+          this.alertHttpError(err, () => this.submitAccion());
           this.cdr.markForCheck();
         },
       });
@@ -405,17 +523,29 @@ export class GestionReportesComponent implements OnInit {
     return this.erlAccion ? this.totalCorregido - this.erlAccion.reporte.montoTotal : 0;
   }
 
+  get correccionTieneMontoInvalido(): boolean {
+    return Object.values(this.montosCorreccion).some(v => String(v).trim() !== '' && Number.parseFloat(String(v)) < 0);
+  }
+
+  montoInvalido(categoriaCodigo: string): boolean {
+    const valor = String(this.montosCorreccion[categoriaCodigo] ?? '');
+    return valor.trim() !== '' && Number.parseFloat(valor) < 0;
+  }
+
   openErlModal(reporte: Reporte, accion: 'soporte' | 'corregir'): void {
+    this.lastFocusedBeforeModal = document.activeElement as HTMLElement;
     this.erlAccion = { reporte, accion };
     this.soporteFile = null;
     this.soporteError = null;
     this.montosCorreccion = {};
     reporte.detalles.forEach(d => { this.montosCorreccion[d.categoriaCodigo] = String(d.montoGastado); });
+    setTimeout(() => document.getElementById('erlModalDialog')?.focus());
   }
 
   closeErlModal(): void {
     if (this.erlLoading) return;
     this.erlAccion = null;
+    this.restoreFocus();
   }
 
   onSoporteSeleccionado(event: Event): void {
@@ -448,11 +578,11 @@ export class GestionReportesComponent implements OnInit {
         .put<Reporte>(`${environment.apiUrl}/v1/reportes/${this.erlAccion.reporte.id}/soporte`, formData)
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
-          next: res => this.onErlAccionExito(res, `Reporte #${res.id} enviado a revisión del ERLE.`),
-          error: err => this.onErlAccionError(err),
+          next: res => this.onErlAccionExito(res, `Reporte #${res.id} enviado a revisión del ERLE.`, 'success'),
+          error: err => this.onErlAccionError(err, () => this.submitErlAccion()),
         });
     } else {
-      if (this.totalCorregido <= 0) return;
+      if (this.totalCorregido <= 0 || this.correccionTieneMontoInvalido) return;
       this.erlLoading = true;
       const detalles = this.erlAccion.reporte.detalles
         .map(d => ({ categoriaCodigo: d.categoriaCodigo, montoGastado: Number.parseFloat(this.montosCorreccion[d.categoriaCodigo]) || 0 }))
@@ -462,27 +592,38 @@ export class GestionReportesComponent implements OnInit {
         .put<Reporte>(`${environment.apiUrl}/v1/reportes/${this.erlAccion.reporte.id}`, { detalles })
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
-          next: res => this.onErlAccionExito(res, `Reporte #${res.id} corregido. Sube un nuevo soporte para reiniciar el flujo.`),
-          error: err => this.onErlAccionError(err),
+          next: res => this.onErlAccionExito(res, `Reporte #${res.id} corregido. Sube un nuevo soporte para reiniciar el flujo.`, 'info'),
+          error: err => this.onErlAccionError(err, () => this.submitErlAccion()),
         });
     }
   }
 
-  private onErlAccionExito(res: Reporte, mensaje: string): void {
+  private onErlAccionExito(res: Reporte, mensaje: string, tipo: 'success' | 'info'): void {
     this.erlLoading = false;
     this.actualizarReporteLocal(res);
     this.erlAccion = null;
-    this.alert.success(mensaje);
+    this.restoreFocus();
+    if (tipo === 'info') this.alert.info(mensaje);
+    else this.alert.success(mensaje);
     this.cdr.markForCheck();
   }
 
-  private onErlAccionError(err: HttpErrorResponse): void {
+  private onErlAccionError(err: HttpErrorResponse, retry: () => void): void {
     this.erlLoading = false;
-    this.alert.error(this.httpErrorMessage(err));
+    this.alertHttpError(err, retry);
     this.cdr.markForCheck();
+  }
+
+  private alertHttpError(err: HttpErrorResponse, retry: () => void): void {
+    const mensaje = this.httpErrorMessage(err);
+    if (err.status === 0) this.alert.error(mensaje, { label: 'Reintentar', onClick: retry });
+    else this.alert.error(mensaje);
   }
 
   private httpErrorMessage(err: HttpErrorResponse): string {
+    // status 0 nunca trae un payload de la API real: err.error es un Error/ProgressEvent
+    // del navegador (p.ej. "Failed to fetch"), así que no debe leerse como mensaje de negocio.
+    if (err.status === 0) return 'No se pudo conectar con el servidor. Verifica tu conexión.';
     const body = err.error;
     if (body?.error) return body.error;
     if (body?.mensaje) return body.mensaje;
@@ -490,11 +631,10 @@ export class GestionReportesComponent implements OnInit {
     switch (err.status) {
       case 400: return 'Solicitud inválida: revisa los datos ingresados.';
       case 401: return 'Tu sesión expiró. Por favor vuelve a iniciar sesión.';
-      case 403: return 'No tienes permisos para gestionar este reporte.';
-      case 404: return 'Endpoint no encontrado. Contacta al administrador.';
+      case 403: return 'No tienes permisos para esta acción.';
+      case 404: return 'Reporte no encontrado, recarga la pantalla.';
       case 409: return 'El reporte fue modificado por otro usuario. Recarga e inténtalo de nuevo.';
       case 422: return 'Los datos enviados no son válidos.';
-      case 0:   return 'No se pudo conectar con el servidor. Verifica tu conexión.';
       default:  return `Error inesperado (${err.status}). Inténtalo de nuevo.`;
     }
   }
