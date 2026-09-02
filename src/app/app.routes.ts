@@ -37,14 +37,14 @@ export const routes: Routes = [
   },
   {
     path: 'presupuestos/crear',
-    canActivate: [authGuard],
+    canActivate: [authGuard, roleGuard('ENL_RECURSOS')],
     loadComponent: () =>
       import('./crear-presupuesto/crear-presupuesto.component')
         .then(m => m.CrearPresupuestoComponent)
   },
   {
     path: 'temporadas/parametros',
-    canActivate: [authGuard, roleGuard('ENL_RECURSOS')],
+    canActivate: [authGuard, roleGuard('ENL_RECURSOS', 'ENL_LOGISTICA', 'ADMIN')],
     loadComponent: () =>
       import('./parametros-temporada/parametros-temporada.component')
         .then(m => m.ParametrosTemporadaComponent)
@@ -72,7 +72,7 @@ export const routes: Routes = [
   },
   {
     path: 'usuarios',
-    canActivate: [authGuard],
+    canActivate: [authGuard, roleGuard('ENL_RECURSOS', 'ENL_LOGISTICA', 'ADMIN')],
     loadComponent: () =>
       import('./create-users/create-users')
         .then(m => m.CreateUsers)
