@@ -17,3 +17,13 @@ export interface CrearUsuarioRequest {
   roleId: number;
   equipoId: number;
 }
+
+export interface UsuarioListado {
+  id: number;
+  name: string;
+  lastname: string;
+  email: string;
+  rol: string;
+  equipo: string;
+  activo: boolean;
+}

@@ -6,17 +6,7 @@ import { Navtab } from '../navtab/navtab';
 import { SessionService } from '../session.service';
 import { Usuario } from '../auth.models';
 import { UsuariosService } from '../usuarios.service';
-import { CrearUsuarioRequest, Equipo, Rol } from '../usuarios.models';
-
-interface MockUsuario {
-  id: number;
-  name: string;
-  lastname: string;
-  email: string;
-  rol: string;
-  equipo: string;
-  activo: boolean;
-}
+import { CrearUsuarioRequest, Equipo, Rol, UsuarioListado } from '../usuarios.models';
 
 interface UserForm {
   name: string;
@@ -62,8 +52,10 @@ export class CreateUsers implements OnInit {
 
   rolesLoading = false;
   equiposLoading = false;
+  usuariosLoading = false;
   rolesError = '';
   equiposError = '';
+  usuariosError = '';
 
   readonly FILTROS: { id: 'todos' | 'activos' | 'inactivos'; label: string }[] = [
     { id: 'todos',     label: 'Todos' },
@@ -86,13 +78,7 @@ export class CreateUsers implements OnInit {
     LOGISTICA: 'gestiona operaciones de logística y entregas',
   };
 
-  usuarios: MockUsuario[] = [
-    { id: 1, name: 'Andrea',    lastname: 'Morales',  email: 'andrea.morales@occ.org',  rol: 'ENL_RECURSOS',  equipo: 'Equipo Nacional de Liderazgo', activo: true },
-    { id: 2, name: 'Carlos',    lastname: 'Restrepo', email: 'carlos.restrepo@occ.org', rol: 'ENL_LOGISTICA', equipo: 'Antioquia',                    activo: true },
-    { id: 3, name: 'Valentina', lastname: 'Torres',   email: 'v.torres@occ.org',        rol: 'ERLE_RECURSOS', equipo: 'Cundinamarca',                 activo: true },
-    { id: 4, name: 'Luis',      lastname: 'Gómez',    email: 'luis.gomez@occ.org',      rol: 'ERL_LOGISTICA', equipo: 'Bogotá Centro',                activo: false },
-    { id: 5, name: 'Diana',     lastname: 'Vargas',   email: 'diana.vargas@occ.org',    rol: 'ERL_RECURSOS',  equipo: 'Barranquilla',                 activo: true },
-  ];
+  usuarios: UsuarioListado[] = [];
 
   search = '';
   estadoFiltro: 'todos' | 'activos' | 'inactivos' = 'todos';
@@ -108,7 +94,7 @@ export class CreateUsers implements OnInit {
   toast: ToastState | null = null;
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
-  confirmTarget: { user: MockUsuario; action: 'inactivate' | 'reactivate' } | null = null;
+  confirmTarget: { user: UsuarioListado; action: 'inactivate' | 'reactivate' } | null = null;
   confirmLoading = false;
 
   menuOpenId: number | null = null;
@@ -118,8 +104,26 @@ export class CreateUsers implements OnInit {
   }
 
   ngOnInit(): void {
+    this.loadUsuarios();
     this.loadRoles();
     this.loadEquipos();
+  }
+
+  loadUsuarios(): void {
+    this.usuariosLoading = true;
+    this.usuariosError = '';
+    this.usuariosService.listarUsuarios().subscribe({
+      next: (usuarios) => {
+        this.usuarios = usuarios;
+        this.usuariosLoading = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.usuariosError = err.error?.error || 'No se pudieron cargar los usuarios';
+        this.usuariosLoading = false;
+        this.cdr.markForCheck();
+      },
+    });
   }
 
   loadRoles(): void {
@@ -156,7 +160,7 @@ export class CreateUsers implements OnInit {
     });
   }
 
-  get filtered(): MockUsuario[] {
+  get filtered(): UsuarioListado[] {
     const q = this.search.toLowerCase();
     return this.usuarios.filter(u => {
       const matchSearch = `${u.name} ${u.lastname} ${u.email} ${u.rol} ${u.equipo}`.toLowerCase().includes(q);
@@ -237,22 +241,10 @@ export class CreateUsers implements OnInit {
     this.usuariosService.crearUsuario(payload).subscribe({
       next: (res) => {
         this.loading = false;
-        if (res.status === 201) {
-          const rol    = this.ROLES.find(r => r.id === payload.roleId);
-          const equipo = this.EQUIPOS.find(e => e.id === payload.equipoId);
-          const nuevoId = this.usuarios.length ? Math.max(...this.usuarios.map(u => u.id)) + 1 : 1;
-          const newUser: MockUsuario = {
-            id: nuevoId,
-            name:     payload.name,
-            lastname: payload.lastname,
-            email:    payload.email,
-            rol:      rol?.nombre   ?? '',
-            equipo:   equipo?.nombre ?? '',
-            activo:   true,
-          };
-          this.usuarios = [...this.usuarios, newUser];
+        if (res.status === 201 && res.body) {
+          this.usuarios = [...this.usuarios, res.body];
           this.drawerOpen = false;
-          this.showToast(`Usuario ${newUser.name} ${newUser.lastname} creado exitosamente`, 'success');
+          this.showToast(`Usuario ${res.body.name} ${res.body.lastname} creado exitosamente`, 'success');
         } else {
           this.showToast('No se pudo crear el usuario. Intenta nuevamente.', 'danger');
         }
@@ -275,7 +267,7 @@ export class CreateUsers implements OnInit {
   @HostListener('document:click')
   closeMenu() { this.menuOpenId = null; }
 
-  openConfirm(user: MockUsuario, action: 'inactivate' | 'reactivate', event: MouseEvent) {
+  openConfirm(user: UsuarioListado, action: 'inactivate' | 'reactivate', event: MouseEvent) {
     event.stopPropagation();
     this.menuOpenId = null;
     this.confirmTarget = { user, action };
@@ -285,19 +277,31 @@ export class CreateUsers implements OnInit {
     if (!this.confirmTarget) return;
     const { user, action } = this.confirmTarget;
     this.confirmLoading = true;
-    setTimeout(() => {
-      const nuevoActivo = action === 'reactivate';
-      this.usuarios = this.usuarios.map(u => u.id === user.id ? { ...u, activo: nuevoActivo } : u);
-      this.confirmLoading = false;
-      this.confirmTarget  = null;
-      this.showToast(
-        nuevoActivo
-          ? `${user.name} ${user.lastname} ha sido reactivado`
-          : `${user.name} ${user.lastname} ha sido inactivado`,
-        nuevoActivo ? 'success' : 'danger',
-      );
-      this.cdr.markForCheck();
-    }, 850);
+    const nuevoActivo = action === 'reactivate';
+    const call = nuevoActivo
+      ? this.usuariosService.activarUsuario(user.id)
+      : this.usuariosService.inactivarUsuario(user.id);
+
+    call.subscribe({
+      next: () => {
+        this.usuarios = this.usuarios.map(u => u.id === user.id ? { ...u, activo: nuevoActivo } : u);
+        this.confirmLoading = false;
+        this.confirmTarget  = null;
+        this.showToast(
+          nuevoActivo
+            ? `${user.name} ${user.lastname} ha sido reactivado`
+            : `${user.name} ${user.lastname} ha sido inactivado`,
+          nuevoActivo ? 'success' : 'danger',
+        );
+        this.cdr.markForCheck();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.confirmLoading = false;
+        const message = err.error?.error || 'No se pudo actualizar el estado del usuario. Intenta nuevamente.';
+        this.showToast(message, 'danger');
+        this.cdr.markForCheck();
+      },
+    });
   }
 
   closeConfirm() { this.confirmTarget = null; }
