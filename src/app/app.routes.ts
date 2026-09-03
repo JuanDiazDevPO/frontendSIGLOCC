@@ -71,6 +71,13 @@ export const routes: Routes = [
         .then(m => m.EntregasComponent)
   },
   {
+    path: 'puntos-entrega',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./puntos-entrega/puntos-entrega.component')
+        .then(m => m.PuntosEntregaComponent)
+  },
+  {
     path: 'capacitaciones',
     canActivate: [authGuard],
     loadComponent: () =>
