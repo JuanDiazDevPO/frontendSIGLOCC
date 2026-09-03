@@ -102,9 +102,9 @@ export class PuntosEntregaComponent implements OnInit {
 
   user: Usuario | null = this.session.getUser();
 
-  // Solo ERLE puede registrar puntos de entrega (regla confirmada en el backend real).
+  // Cualquier rol del área de Logística (ERL/ERLE/ENL_LOGISTICA) puede registrar puntos de entrega.
   get canCrear(): boolean {
-    return (this.user?.rol ?? '').startsWith('ERLE');
+    return (this.user?.rol ?? '').includes('LOGISTICA');
   }
 
   @HostListener('document:keydown.escape')
@@ -358,7 +358,7 @@ export class PuntosEntregaComponent implements OnInit {
       case 401: return 'Tu sesión expiró. Por favor vuelve a iniciar sesión.';
       case 403: return 'No tienes permisos para registrar puntos de entrega.';
       case 404: return 'Endpoint no encontrado. Contacta al administrador.';
-      case 409: return 'Solo los equipos ERLE pueden registrar puntos de entrega.';
+      case 409: return 'No se pudo registrar el punto: ya existe un conflicto con los datos ingresados.';
       case 422: return 'Los datos enviados no son válidos.';
       case 0:   return 'No se pudo conectar con el servidor. Verifica tu conexión.';
       default:  return `Error inesperado (${err.status}). Inténtalo de nuevo.`;
