@@ -1,0 +1,212 @@
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-heading">Capacitaciones · Momento 2</div>
+        <div class="topbar-sub">
+          <label class="field-label-inline" for="temporadaHeaderSelect">Temporada</label>
+          <select id="temporadaHeaderSelect" class="form-input form-select form-select--sm"
+            [ngModel]="temporadaSeleccionada" (ngModelChange)="seleccionarTemporada($event)"
+            name="temporadaHeaderSelect" [disabled]="temporadasLoading">
+            <option value="">{{ temporadasLoading ? 'Cargando temporadas…' : 'Selecciona temporada' }}</option>
+            @for (t of temporadas; track t.id) {
+              <option [value]="t.id">{{ t.nombre }}{{ t.esActual ? ' (actual)' : '' }}</option>
+            }
+          </select>
+          @if (temporadasError) { <span class="field-error">⚠ {{ temporadasError }}</span> }
+        </div>
+      </div>
+      <button class="btn-primary" (click)="abrirDrawer()" type="button" [disabled]="!temporadaSeleccionada" title="Registrar capacitación">
+        ➕ Registrar capacitación
+      </button>
+    </header>
+
+    <div class="content">
+      @if (capacitacionesError) {
+        <div class="error-banner">⚠ {{ capacitacionesError }}</div>
+      }
+
+      <!-- KPIs -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-card__value">{{ stats.jornadas }}</div>
+          <div class="kpi-card__label">Jornadas registradas</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__value kpi-card__value--warn">{{ stats.iglesiasCapacitadas }}</div>
+          <div class="kpi-card__label">Iglesias capacitadas</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__value kpi-card__value--info">{{ stats.maestros | number: '1.0-0' }}</div>
+          <div class="kpi-card__label">Maestros formados</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__value kpi-card__value--ok">{{ stats.cajas | number: '1.0-0' }}</div>
+          <div class="kpi-card__label">Cajas generadas</div>
+        </div>
+      </div>
+
+      <!-- Búsqueda -->
+      <div class="toolbar">
+        <div class="search-wrap">
+          <label class="sr-only" for="capsSearch">Buscar por iglesia o ciudad</label>
+          <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="capsSearch" class="search-input" [(ngModel)]="search" name="search" type="text" placeholder="Buscar por iglesia o ciudad…" />
+        </div>
+        <span class="result-count">{{ filtradas.length }} jornada{{ filtradas.length !== 1 ? 's' : '' }}</span>
+      </div>
+
+      <!-- Tabla -->
+      <div class="table-card">
+        <div class="table-scroll">
+          <table class="caps-table">
+            <thead>
+              <tr>
+                <th>Iglesia</th>
+                <th>Fecha</th>
+                <th class="col-right">Maestros</th>
+                <th class="col-right">Cajas calculadas</th>
+                <th class="col-right">GM</th>
+                <th class="col-right">MPG</th>
+                <th>Observaciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (capacitacionesLoading) {
+                <tr><td colspan="7" class="empty-cell"><span class="spinner-sm spinner-sm--dark"></span> Cargando capacitaciones…</td></tr>
+              } @else if (filtradas.length === 0) {
+                <tr>
+                  <td colspan="7" class="empty-cell">
+                    <div class="empty-icon">🎓</div>
+                    Sin capacitaciones registradas
+                  </td>
+                </tr>
+              } @else {
+                @for (c of filtradas; track c.id) {
+                  <tr>
+                    <td>
+                      <div class="iglesia-cell">
+                        <span class="iglesia-nombre">{{ iglesiaNombre(c.iglesiaId) }}</span>
+                        <span class="iglesia-sub">{{ iglesiaCiudad(c.iglesiaId) }} · #{{ c.id }}</span>
+                      </div>
+                    </td>
+                    <td class="cell-muted nowrap">{{ fmtFecha(c.fechaCapacitacion) }}</td>
+                    <td class="col-right">{{ c.maestrosEnviados }}</td>
+                    <td class="col-right"><span class="cajas-badge">{{ c.cajasCalculadas | number: '1.0-0' }}</span></td>
+                    <td class="col-right" [class.cell-warn]="c.gmEntregados < c.maestrosEnviados">{{ c.gmEntregados }}</td>
+                    <td class="col-right" [class.cell-warn]="c.mpgEntregados < c.maestrosEnviados">{{ c.mpgEntregados }}</td>
+                    <td class="cell-obs">{{ c.observaciones || '—' }}</td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ══════════════════════ DRAWER: REGISTRAR CAPACITACIÓN ══════════════════════ -->
+  @if (drawerOpen) {
+    <div class="drawer-overlay" role="button" tabindex="0" aria-label="Cerrar panel"
+      (click)="$event.target === $event.currentTarget && cerrarDrawer()"
+      (keydown.enter)="$event.target === $event.currentTarget && cerrarDrawer()"
+      (keydown.escape)="cerrarDrawer()">
+      <div class="drawer" id="capacitacionDrawerDialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+        <div class="drawer-header">
+          <div>
+            <div id="drawerTitle" class="drawer-title">Registrar capacitación</div>
+          </div>
+          <button class="icon-btn" (click)="cerrarDrawer()" type="button" aria-label="Cerrar" title="Cerrar">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div class="drawer-body">
+          <div class="info-note">
+            Solo iglesias en estado <strong>APROBADA</strong> pueden registrar capacitación. Las cajas se calculan: <strong>maestros × {{ CAJAS_POR_MAESTRO }}</strong>.
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="capIglesia">Iglesia <span class="required">*</span></label>
+            <select id="capIglesia" class="form-input form-select" [class.form-input--error]="error('iglesiaId')"
+              [(ngModel)]="form.iglesiaId" name="capIglesia">
+              <option value="">Seleccionar iglesia aprobada</option>
+              @for (i of iglesiasAprobadas; track i.id) {
+                <option [value]="i.id">{{ i.nombre }} — {{ i.ciudad }}</option>
+              }
+            </select>
+            @if (error('iglesiaId')) { <span class="field-error">⚠ {{ error('iglesiaId') }}</span> }
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="capTemporada">Temporada <span class="required">*</span></label>
+              <select id="capTemporada" class="form-input form-select" [class.form-input--error]="error('temporadaId')"
+                [(ngModel)]="form.temporadaId" name="capTemporada">
+                <option value="">Seleccionar</option>
+                @for (t of temporadas; track t.id) {
+                  <option [value]="t.id">{{ t.nombre }}</option>
+                }
+              </select>
+              @if (error('temporadaId')) { <span class="field-error">⚠ {{ error('temporadaId') }}</span> }
+            </div>
+            <div class="field">
+              <label class="field-label" for="capFecha">Fecha de capacitación <span class="required">*</span></label>
+              <input id="capFecha" class="form-input" [class.form-input--error]="error('fechaCapacitacion')"
+                type="date" [(ngModel)]="form.fechaCapacitacion" name="capFecha" (click)="abrirCalendario($event)" />
+              @if (error('fechaCapacitacion')) { <span class="field-error">⚠ {{ error('fechaCapacitacion') }}</span> }
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="capMaestros">Maestros que asistieron <span class="required">*</span></label>
+            <input id="capMaestros" class="form-input" [class.form-input--error]="error('maestrosEnviados')"
+              type="number" min="0" [ngModel]="form.maestrosEnviados" (ngModelChange)="onMaestrosChange($event)"
+              name="capMaestros" placeholder="Ej: 8" />
+            @if (error('maestrosEnviados')) { <span class="field-error">⚠ {{ error('maestrosEnviados') }}</span> }
+          </div>
+
+          <div class="cajas-preview" [class.cajas-preview--activa]="cajasCalculadas > 0">
+            <div>
+              <div class="cajas-preview__label">Cajas calculadas</div>
+              <div class="cajas-preview__hint">{{ maestrosNum }} maestros × {{ CAJAS_POR_MAESTRO }}</div>
+            </div>
+            <div class="cajas-preview__value">{{ cajasCalculadas | number: '1.0-0' }}</div>
+          </div>
+
+          <div class="section-label">Literatura entregada a maestros</div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="capGm">GM (Guías Ministeriales)</label>
+              <input id="capGm" class="form-input" type="number" min="0" [(ngModel)]="form.gmEntregados" name="capGm" placeholder="= maestros" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="capMpg">MPG (libros)</label>
+              <input id="capMpg" class="form-input" type="number" min="0" [(ngModel)]="form.mpgEntregados" name="capMpg" placeholder="= maestros" />
+            </div>
+          </div>
+          <div class="field-hint">Normalmente = número de maestros. Ajusta si hubo diferencia.</div>
+
+          <div class="field">
+            <label class="field-label" for="capObs">Observaciones</label>
+            <textarea id="capObs" class="form-input form-textarea" [(ngModel)]="form.observaciones" name="capObs" rows="3" placeholder="Notas de la jornada…"></textarea>
+          </div>
+        </div>
+
+        <div class="drawer-footer">
+          <button class="btn-cancel" (click)="cerrarDrawer()" type="button" [disabled]="drawerLoading" title="Cancelar">Cancelar</button>
+          <button class="btn-confirm" [disabled]="drawerLoading" (click)="submitDrawer()" type="button" title="Registrar capacitación">
+            @if (drawerLoading) {
+              <span class="spinner-sm"></span> Registrando…
+            } @else {
+              🎓 Registrar
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>
