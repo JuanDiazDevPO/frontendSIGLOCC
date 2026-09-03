@@ -1,0 +1,265 @@
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-heading">Gestión de Anticipos</div>
+    </header>
+
+    <div class="content">
+      @if (anticiposError) {
+        <div class="error-banner">⚠ {{ anticiposError }}</div>
+      }
+
+      <!-- Saldos del propio equipo -->
+      <div class="saldos-grid">
+        @if (saldosLoading) {
+          <div class="saldo-card saldo-card--empty"><span class="spinner-sm spinner-sm--dark"></span> Cargando saldos…</div>
+        } @else if (saldosError) {
+          <div class="saldo-card saldo-card--empty">{{ saldosError }}</div>
+        } @else if (saldos) {
+          @for (r of saldosRubros; track r.tipo) {
+            <div class="saldo-card">
+              <div class="saldo-card__head">
+                <span class="saldo-card__label" [class]="TIPO_PRES[r.tipo].cssClass">{{ TIPO_PRES[r.tipo].icon }} {{ TIPO_PRES[r.tipo].label }}</span>
+                <span class="saldo-card__disp">Disp: {{ cop(r.saldo.disponible) }}</span>
+              </div>
+              <div class="saldo-bar">
+                <div class="saldo-bar__fill" [class]="TIPO_PRES[r.tipo].cssClass" [style.width.%]="pct(r.saldo)"></div>
+              </div>
+              <div class="saldo-card__foot">
+                <span>Ejecutado {{ cop(r.saldo.ejecutado) }}</span>
+                <span>{{ pct(r.saldo) }}% de {{ cop(r.saldo.presupuesto) }}</span>
+              </div>
+            </div>
+          }
+          <div class="saldos-scope-note">Saldos de {{ saldos.equipoNombre }} (tu equipo) — la API no expone saldos agregados de otros equipos.</div>
+        }
+      </div>
+
+      <!-- KPIs -->
+      <div class="stats-grid">
+        <div class="stat-card stat-card--pending" [class.stat-card--active]="filtroEstado === 'PENDIENTE'" (click)="toggleFiltro('PENDIENTE')" role="button" tabindex="0" (keydown.enter)="toggleFiltro('PENDIENTE')">
+          <div class="stat-value stat-value--pending">{{ kpi.pendientes }}</div>
+          <div class="stat-label">Por aprobar</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value stat-value--accent">{{ cop(kpi.montoPendiente) }}</div>
+          <div class="stat-label">Monto pendiente</div>
+        </div>
+        <div class="stat-card stat-card--ok" [class.stat-card--active]="filtroEstado === 'APROBADO'" (click)="toggleFiltro('APROBADO')" role="button" tabindex="0" (keydown.enter)="toggleFiltro('APROBADO')">
+          <div class="stat-value stat-value--ok">{{ kpi.aprobados }}</div>
+          <div class="stat-label">Aprobados</div>
+        </div>
+        <div class="stat-card stat-card--danger" [class.stat-card--active]="filtroEstado === 'RECHAZADO'" (click)="toggleFiltro('RECHAZADO')" role="button" tabindex="0" (keydown.enter)="toggleFiltro('RECHAZADO')">
+          <div class="stat-value stat-value--danger">{{ kpi.rechazados }}</div>
+          <div class="stat-label">Rechazados</div>
+        </div>
+      </div>
+
+      <!-- Filtros + búsqueda -->
+      <div class="toolbar">
+        <div class="filter-tabs">
+          <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'PENDIENTE'" (click)="toggleFiltro('PENDIENTE')" type="button">Por aprobar ({{ kpi.pendientes }})</button>
+          <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'todos'" (click)="toggleFiltro('todos')" type="button">Todos</button>
+          <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'APROBADO'" (click)="toggleFiltro('APROBADO')" type="button">Aprobados</button>
+          <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'RECHAZADO'" (click)="toggleFiltro('RECHAZADO')" type="button">Rechazados</button>
+        </div>
+        <div class="search-wrap">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <label class="sr-only" for="anticiposSearch">Buscar por título, equipo o titular</label>
+          <input id="anticiposSearch" class="search-input" [(ngModel)]="search" name="search" type="text" placeholder="Buscar por título, equipo, titular…" />
+        </div>
+        <span class="result-count">{{ filtrados.length }} resultado{{ filtrados.length !== 1 ? 's' : '' }}</span>
+      </div>
+
+      <!-- Tabla -->
+      <div class="table-card">
+        <div class="table-scroll">
+          <table class="anticipos-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Título</th>
+                <th>Equipo</th>
+                <th>Rubro</th>
+                <th class="col-right">Monto</th>
+                <th>Estado</th>
+                <th>Solicitud</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (anticiposLoading) {
+                <tr><td colspan="8" class="empty-cell"><span class="spinner-sm spinner-sm--dark"></span> Cargando anticipos…</td></tr>
+              } @else if (filtrados.length === 0) {
+                <tr>
+                  <td colspan="8" class="empty-cell">
+                    <div class="empty-icon">💰</div>
+                    No hay anticipos en esta categoría
+                  </td>
+                </tr>
+              } @else {
+                @for (a of filtrados; track a.id) {
+                  <tr class="anticipo-row" [class.anticipo-row--pendiente]="a.estado === 'PENDIENTE'" (click)="abrirDetalle(a)" role="button" tabindex="0" (keydown.enter)="abrirDetalle(a)">
+                    <td class="col-id">#{{ a.id }}</td>
+                    <td>
+                      <div class="cell-title">{{ a.titulo }}</div>
+                      <div class="cell-sub">{{ a.nombreTitular }}</div>
+                    </td>
+                    <td class="cell-muted">{{ a.equipoNombre }}</td>
+                    <td><span class="tipo-chip" [class]="TIPO_PRES[a.tipoPresupuesto].cssClass">{{ TIPO_PRES[a.tipoPresupuesto].icon }} {{ TIPO_PRES[a.tipoPresupuesto].label }}</span></td>
+                    <td class="col-right col-monto">{{ cop(a.montoSolicitado) }}</td>
+                    <td><span class="status-badge" [class]="'status-badge--' + a.estado.toLowerCase()"><span class="status-dot"></span>{{ ESTADO_LABEL[a.estado] }}</span></td>
+                    <td class="cell-muted nowrap">{{ fmtFecha(a.fechaSolicitud) }}</td>
+                    <td (click)="$event.stopPropagation()">
+                      @if (a.estado === 'PENDIENTE' && canAprobar) {
+                        <button class="btn-row-action btn-row-action--primary" (click)="openAprobar(a)" type="button">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          Aprobar
+                        </button>
+                      } @else {
+                        <button class="btn-row-action" (click)="abrirDetalle(a)" type="button">Ver detalle</button>
+                      }
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ══════════════════════ DRAWER: DETALLE ══════════════════════ -->
+  <div class="drawer-overlay" [class.drawer-overlay--open]="!!detalle" role="button" tabindex="0"
+    aria-label="Cerrar detalle del anticipo"
+    (click)="closeDetalle()" (keydown.enter)="closeDetalle()" (keydown.escape)="closeDetalle()"></div>
+  @if (detalle) {
+    <div class="drawer drawer--open" role="dialog" aria-modal="true" aria-labelledby="detalleAnticipoTitle">
+      <div class="drawer-header">
+        <div>
+          <div class="detalle-heading">
+            <span id="detalleAnticipoTitle" class="detalle-id">#{{ detalle.id }} · {{ detalle.titulo }}</span>
+            <span class="status-badge status-badge--big" [class]="'status-badge--' + detalle.estado.toLowerCase()">
+              <span class="status-dot"></span>{{ ESTADO_LABEL[detalle.estado] }}
+            </span>
+          </div>
+          <div class="detalle-sub">{{ detalle.equipoNombre }} · {{ fmtFechaHora(detalle.fechaSolicitud) }}</div>
+        </div>
+        <button class="icon-btn" (click)="closeDetalle()" type="button" aria-label="Cerrar">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="drawer-body">
+        <div class="monto-box" [class]="TIPO_PRES[detalle.tipoPresupuesto].boxClass">
+          <div class="monto-box__head">
+            <span class="monto-box__label">Monto solicitado</span>
+            <span class="tipo-chip" [class]="TIPO_PRES[detalle.tipoPresupuesto].cssClass">{{ TIPO_PRES[detalle.tipoPresupuesto].icon }} {{ TIPO_PRES[detalle.tipoPresupuesto].label }}</span>
+          </div>
+          <div class="monto-box__value">{{ cop(detalle.montoSolicitado) }}</div>
+        </div>
+
+        @if (detalle.estado === 'RECHAZADO' && detalle.motivoRechazo) {
+          <div class="rechazo-box">
+            <div class="rechazo-box__title">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              Rechazo automático
+            </div>
+            <div class="rechazo-box__desc">{{ detalle.motivoRechazo }}</div>
+          </div>
+        }
+
+        <div>
+          <div class="section-label">Solicitud</div>
+          <div class="descripcion-text">{{ detalle.descripcion }}</div>
+          <div class="info-row"><span>Ciudad</span><span>{{ detalle.ciudad }}</span></div>
+          <div class="info-row"><span>Cédula solicitante</span><span>{{ detalle.cedula }}</span></div>
+        </div>
+
+        <div>
+          <div class="section-label">Datos bancarios para el giro</div>
+          <div class="info-row"><span>Banco</span><span>{{ detalle.banco }}</span></div>
+          <div class="info-row"><span>Tipo de cuenta</span><span>{{ detalle.tipoCuenta }}</span></div>
+          <div class="info-row"><span>Número de cuenta</span><span>{{ detalle.numeroCuenta }}</span></div>
+          <div class="info-row"><span>Titular</span><span>{{ detalle.nombreTitular }}</span></div>
+          <div class="info-row"><span>Cédula del titular</span><span>{{ detalle.cedulaTitular }}</span></div>
+        </div>
+
+        <div>
+          <div class="section-label">Documento formal</div>
+          @if (detalle.rutaPdf) {
+            <div class="pdf-row">
+              <div class="pdf-row__icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </div>
+              <div class="pdf-row__name">{{ detalle.rutaPdf }}</div>
+              <button class="btn-outline-sm" (click)="descargarPdf(detalle)" type="button" [disabled]="descargandoPdf">
+                @if (descargandoPdf) {
+                  <span class="spinner-sm spinner-sm--dark"></span>
+                } @else {
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                }
+                PDF
+              </button>
+            </div>
+          } @else {
+            <div class="field-hint">Sin PDF (solicitud rechazada)</div>
+          }
+        </div>
+
+        @if (detalle.estado === 'APROBADO') {
+          <div class="aprobado-note">✅ Aprobado el {{ fmtFecha(detalle.fechaAprobacionFinal) }}</div>
+        }
+      </div>
+
+      @if (detalle.estado === 'PENDIENTE' && canAprobar) {
+        <div class="drawer-footer drawer-footer--stack">
+          <button class="btn-confirm btn-confirm--wide" (click)="openAprobar(detalle)" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Aprobar anticipo
+          </button>
+          <div class="field-hint field-hint--center">El rechazo es automático por saldo — no se rechaza manualmente.</div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ══════════════════════ MODAL: APROBAR ══════════════════════ -->
+  @if (aprobarTarget) {
+    <div class="modal-overlay" role="button" tabindex="0" aria-label="Cerrar diálogo"
+      (click)="$event.target === $event.currentTarget && closeAprobar()"
+      (keydown.enter)="closeAprobar()" (keydown.escape)="closeAprobar()">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="aprobarModalTitle">
+        <div class="modal-body">
+          <div class="modal-icon modal-icon--ok">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div>
+            <div class="modal-title" id="aprobarModalTitle">Aprobar anticipo #{{ aprobarTarget.id }}</div>
+            <div class="modal-desc">
+              {{ aprobarTarget.titulo }} · {{ aprobarTarget.equipoNombre }} · <strong>{{ cop(aprobarTarget.montoSolicitado) }}</strong>
+            </div>
+            <div class="modal-note">
+              Como <strong>ENL_RECURSOS</strong>, tu aprobación es final. El monto quedará registrado como ejecutado en la bolsa {{ TIPO_PRES[aprobarTarget.tipoPresupuesto].label }}.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <div class="modal-actions">
+            <button class="btn-cancel" (click)="closeAprobar()" type="button" [disabled]="aprobando">Cancelar</button>
+            <button class="btn-confirm" (click)="confirmarAprobar()" type="button" [disabled]="aprobando">
+              @if (aprobando) {
+                <span class="spinner-sm"></span> Aprobando…
+              } @else {
+                Confirmar aprobación
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</div>
