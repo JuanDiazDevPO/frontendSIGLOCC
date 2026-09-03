@@ -799,19 +799,10 @@
   padding: 14px 24px;
   border-top: 1px solid #e9eaec;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   background: white;
   gap: 12px;
-}
-
-.modal-endpoint {
-  font-size: 11px;
-  color: #757575;
-  background: #f3f4f6;
-  padding: 3px 7px;
-  border-radius: 4px;
-  font-family: monospace;
 }
 
 .modal-actions {

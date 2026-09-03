@@ -66,7 +66,12 @@
             </tr>
           </thead>
           <tbody>
-            @for (u of filtered; track u.id) {
+            @if (usuariosLoading) {
+              <tr><td colspan="6" class="empty-state"><span class="spinner-sm"></span> Cargando usuarios…</td></tr>
+            } @else if (usuariosError) {
+              <tr><td colspan="6" class="empty-state">⚠ {{ usuariosError }} <button class="field-retry" type="button" (click)="loadUsuarios()">Reintentar</button></td></tr>
+            } @else {
+              @for (u of filtered; track u.id) {
               <tr [class.row--inactive]="!u.activo">
                 <td class="td-user">
                   <div class="user-cell">
@@ -124,11 +129,12 @@
                   </div>
                 </td>
               </tr>
+              }
             }
           </tbody>
         </table>
 
-        @if (filtered.length === 0) {
+        @if (!usuariosLoading && !usuariosError && filtered.length === 0) {
           <div class="empty-state">
             @if (search) {
               Sin resultados para "{{ search }}"
@@ -398,7 +404,6 @@
         </div>
 
         <div class="modal-footer">
-          <code class="modal-endpoint">PATCH /api/v1/usuarios/{{ confirmTarget.user.id }}/estado</code>
           <div class="modal-actions">
             <button class="btn-cancel" (click)="closeConfirm()" type="button">Cancelar</button>
             <button class="btn-confirm"
