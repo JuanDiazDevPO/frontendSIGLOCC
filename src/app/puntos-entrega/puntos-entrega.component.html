@@ -1,0 +1,376 @@
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-heading">Puntos de Entrega</div>
+        <div class="topbar-sub">
+          <label class="field-label-inline" for="temporadaHeaderSelect">Temporada</label>
+          <select id="temporadaHeaderSelect" class="form-input form-select form-select--sm"
+            [ngModel]="temporadaSeleccionada" (ngModelChange)="seleccionarTemporada($event)"
+            name="temporadaHeaderSelect" [disabled]="temporadasLoading">
+            <option value="">{{ temporadasLoading ? 'Cargando temporadas…' : 'Selecciona temporada' }}</option>
+            @for (t of temporadas; track t.id) {
+              <option [value]="t.id">{{ t.nombre }}{{ t.esActual ? ' (actual)' : '' }}</option>
+            }
+          </select>
+          @if (temporadasError) { <span class="field-error">⚠ {{ temporadasError }}</span> }
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="view-toggle">
+          <button class="view-toggle-btn" [class.view-toggle-btn--active]="vistaCards" (click)="toggleVista(true)" type="button" aria-label="Ver en tarjetas" [attr.aria-pressed]="vistaCards">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </button>
+          <button class="view-toggle-btn" [class.view-toggle-btn--active]="!vistaCards" (click)="toggleVista(false)" type="button" aria-label="Ver en tabla" [attr.aria-pressed]="!vistaCards">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          </button>
+        </div>
+        @if (canCrear) {
+          <button class="btn-primary" (click)="openCrear()" type="button" [disabled]="!temporadaSeleccionada">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nuevo punto
+          </button>
+        }
+      </div>
+    </header>
+
+    <div class="content">
+      @if (puntosError) {
+        <div class="error-banner">⚠ {{ puntosError }}</div>
+      }
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card" [class.stat-card--active]="filtroScore === ''" (click)="toggleFiltroScore('')" role="button" tabindex="0" (keydown.enter)="toggleFiltroScore('')">
+          <div class="stat-value">{{ stats.total }}</div>
+          <div class="stat-label">Total puntos</div>
+        </div>
+        <div class="stat-card stat-card--ok" [class.stat-card--active]="filtroScore === 'ok'" (click)="toggleFiltroScore('ok')" role="button" tabindex="0" (keydown.enter)="toggleFiltroScore('ok')">
+          <div class="stat-value stat-value--ok">{{ stats.optimos }}</div>
+          <div class="stat-label">Óptimos (5/5)</div>
+        </div>
+        <div class="stat-card stat-card--pending" [class.stat-card--active]="filtroScore === 'parcial'" (click)="toggleFiltroScore('parcial')" role="button" tabindex="0" (keydown.enter)="toggleFiltroScore('parcial')">
+          <div class="stat-value stat-value--pending">{{ stats.parciales }}</div>
+          <div class="stat-label">Parciales (3-4/5)</div>
+        </div>
+        <div class="stat-card stat-card--danger" [class.stat-card--active]="filtroScore === 'malo'" (click)="toggleFiltroScore('malo')" role="button" tabindex="0" (keydown.enter)="toggleFiltroScore('malo')">
+          <div class="stat-value stat-value--danger">{{ stats.insuficientes }}</div>
+          <div class="stat-label">Insuficientes (&lt;3)</div>
+        </div>
+      </div>
+
+      <!-- Search / filter -->
+      <div class="toolbar">
+        <div class="search-wrap">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <label class="sr-only" for="puntosSearch">Buscar por nombre, ciudad o dirección</label>
+          <input id="puntosSearch" class="search-input" [(ngModel)]="search" name="search" type="text" placeholder="Buscar por nombre, ciudad, dirección…" />
+        </div>
+        @if (search || filtroScore) {
+          <button class="link-btn" (click)="limpiarFiltros()" type="button">✕ Limpiar</button>
+        }
+        <span class="result-count">{{ filtrados.length }} punto{{ filtrados.length !== 1 ? 's' : '' }}</span>
+      </div>
+
+      @if (vistaCards) {
+        <!-- Vista de tarjetas -->
+        <div class="cards-grid">
+          @if (puntosLoading) {
+            <div class="empty-cell empty-cell--full"><span class="spinner-sm spinner-sm--dark"></span> Cargando puntos de entrega…</div>
+          } @else if (filtrados.length === 0) {
+            <div class="empty-cell empty-cell--full">
+              <div class="empty-icon">📍</div>
+              Sin puntos de entrega registrados
+            </div>
+          } @else {
+            @for (p of filtrados; track p.id) {
+              <div class="punto-card" (click)="abrirDetalle(p)" role="button" tabindex="0" (keydown.enter)="abrirDetalle(p)">
+                <div class="punto-card__top">
+                  <div class="punto-card__id-block">
+                    <div class="punto-card__nombre">{{ p.nombre }}</div>
+                    <div class="punto-card__ubicacion">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      {{ p.ciudad }}, {{ p.departamento }}
+                    </div>
+                  </div>
+                  <div class="score-pill" [class]="'score-pill--' + scoreColor(score(p))">{{ score(p) }}/5 ✓</div>
+                </div>
+
+                <div class="punto-card__direccion">{{ p.direccion }}</div>
+
+                <div class="punto-card__checklist">
+                  @for (c of condiciones; track c.key) {
+                    <div class="checklist-mini">
+                      <span class="checklist-mini__dot" [class.checklist-mini__dot--on]="p[c.key]"></span>
+                      <span class="checklist-mini__label" [class.checklist-mini__label--on]="p[c.key]">{{ c.label }}</span>
+                    </div>
+                  }
+                </div>
+
+                @if (p.urlMaps) {
+                  <a class="punto-card__maps" [href]="p.urlMaps" target="_blank" rel="noreferrer" (click)="$event.stopPropagation()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                    Ver en Google Maps ↗
+                  </a>
+                }
+              </div>
+            }
+          }
+        </div>
+      } @else {
+        <!-- Vista de tabla -->
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="puntos-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Ubicación</th>
+                  <th>Dirección</th>
+                  <th>Condiciones</th>
+                  <th>GPS</th>
+                </tr>
+              </thead>
+              <tbody>
+                @if (puntosLoading) {
+                  <tr><td colspan="5" class="empty-cell"><span class="spinner-sm spinner-sm--dark"></span> Cargando puntos de entrega…</td></tr>
+                } @else if (filtrados.length === 0) {
+                  <tr>
+                    <td colspan="5" class="empty-cell">
+                      <div class="empty-icon">📍</div>
+                      Sin puntos de entrega registrados
+                    </td>
+                  </tr>
+                } @else {
+                  @for (p of filtrados; track p.id) {
+                    <tr class="punto-row" (click)="abrirDetalle(p)" role="button" tabindex="0" (keydown.enter)="abrirDetalle(p)">
+                      <td>
+                        <div class="cell-title">{{ p.nombre }}</div>
+                        <div class="cell-sub">#{{ p.id }}</div>
+                      </td>
+                      <td class="cell-muted">{{ p.ciudad }}, {{ p.departamento }}</td>
+                      <td class="cell-muted col-direccion">{{ p.direccion }}</td>
+                      <td>
+                        <div class="row-checklist">
+                          @for (c of condiciones; track c.key) {
+                            <span [class]="'row-checklist__dot' + (p[c.key] ? ' row-checklist__dot--on row-checklist__dot--' + scoreColor(score(p)) : '')" [title]="c.label"></span>
+                          }
+                          <span class="row-checklist__score" [class]="'row-checklist__score--' + scoreColor(score(p))">{{ score(p) }}/5</span>
+                        </div>
+                      </td>
+                      <td (click)="$event.stopPropagation()">
+                        @if (p.urlMaps) {
+                          <a class="maps-link" [href]="p.urlMaps" target="_blank" rel="noreferrer">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                            Maps ↗
+                          </a>
+                        } @else {
+                          <span class="no-gps">Sin GPS</span>
+                        }
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    </div>
+  </main>
+
+  <!-- ══════════════════════ DRAWER: CREAR PUNTO ══════════════════════ -->
+  @if (canCrear) {
+    <div class="drawer-overlay" [class.drawer-overlay--open]="drawerCrearOpen" role="button" tabindex="0"
+      aria-label="Cerrar panel de nuevo punto"
+      (click)="closeCrear()" (keydown.enter)="closeCrear()" (keydown.escape)="closeCrear()"></div>
+    <div class="drawer" [class.drawer--open]="drawerCrearOpen" role="dialog" aria-modal="true" aria-labelledby="crearPuntoTitle">
+      <div class="drawer-header">
+        <div>
+          <div class="drawer-title" id="crearPuntoTitle">Nuevo punto de entrega</div>
+          <div class="drawer-subtitle">{{ temporadaSeleccionada ? ('Temporada #' + temporadaSeleccionada) : '' }}</div>
+        </div>
+        <button class="icon-btn" (click)="closeCrear()" type="button" aria-label="Cerrar" [disabled]="loadingCrear">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="drawer-body">
+        <div class="info-note">
+          <strong>Auto-resuelto:</strong> el equipo responsable se extrae del JWT de sesión. Solo los equipos <strong>ERLE</strong> pueden registrar puntos de entrega.
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="nombre">Nombre del punto <span class="required">*</span></label>
+          <input id="nombre" class="form-input" [class.form-input--error]="errCrear('nombre')"
+            [(ngModel)]="formCrear.nombre" name="nombre" type="text" placeholder="Ej: Bodega Norte Medellín" />
+          @if (errCrear('nombre')) { <span class="field-error">⚠ {{ errCrear('nombre') }}</span> }
+        </div>
+
+        <div class="section-label">📍 Ubicación</div>
+        <div class="grid-2">
+          <div class="field">
+            <label class="field-label" for="departamento">Departamento <span class="required">*</span></label>
+            <select id="departamento" class="form-input form-select" [class.form-input--error]="errCrear('departamento')"
+              [(ngModel)]="formCrear.departamento" name="departamento">
+              <option value="">Seleccionar</option>
+              @for (d of departamentos; track d) {
+                <option [value]="d">{{ d }}</option>
+              }
+            </select>
+            @if (errCrear('departamento')) { <span class="field-error">⚠ {{ errCrear('departamento') }}</span> }
+          </div>
+          <div class="field">
+            <label class="field-label" for="ciudad">Ciudad / Municipio <span class="required">*</span></label>
+            <input id="ciudad" class="form-input" [class.form-input--error]="errCrear('ciudad')"
+              [(ngModel)]="formCrear.ciudad" name="ciudad" type="text" placeholder="Ej: Medellín" />
+            @if (errCrear('ciudad')) { <span class="field-error">⚠ {{ errCrear('ciudad') }}</span> }
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="direccion">Dirección detallada <span class="required">*</span></label>
+          <textarea id="direccion" class="form-input form-textarea" [class.form-input--error]="errCrear('direccion')"
+            [(ngModel)]="formCrear.direccion" name="direccion" rows="2" placeholder="Ej: Carrera 52 #80-15, Bodega Industrial Norte"></textarea>
+          @if (errCrear('direccion')) { <span class="field-error">⚠ {{ errCrear('direccion') }}</span> }
+        </div>
+
+        <div class="section-label">🗺️ Coordenadas GPS (opcionales)</div>
+        <div class="grid-2">
+          <div class="field">
+            <label class="field-label" for="lat">Latitud</label>
+            <input id="lat" class="form-input" [class.form-input--error]="errCrear('coordenadasLat')"
+              [(ngModel)]="formCrear.coordenadasLat" name="coordenadasLat" type="text" inputmode="decimal" placeholder="Ej: 6.2518" />
+            @if (errCrear('coordenadasLat')) { <span class="field-error">⚠ {{ errCrear('coordenadasLat') }}</span> }
+          </div>
+          <div class="field">
+            <label class="field-label" for="lng">Longitud</label>
+            <input id="lng" class="form-input" [class.form-input--error]="errCrear('coordenadasLng')"
+              [(ngModel)]="formCrear.coordenadasLng" name="coordenadasLng" type="text" inputmode="decimal" placeholder="Ej: -75.5636" />
+            @if (errCrear('coordenadasLng')) { <span class="field-error">⚠ {{ errCrear('coordenadasLng') }}</span> }
+          </div>
+        </div>
+        @if (formCrear.coordenadasLat && formCrear.coordenadasLng && !errCrear('coordenadasLat') && !errCrear('coordenadasLng')) {
+          <div class="map-preview">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>{{ formCrear.coordenadasLat }}, {{ formCrear.coordenadasLng }}</span>
+          </div>
+        }
+        <div class="field-hint">Si ingresas coordenadas, el backend genera automáticamente el enlace de Google Maps.</div>
+
+        <div class="checklist-header">
+          <div class="section-label section-label--flush">✅ Condiciones logísticas del lugar</div>
+          <span class="checklist-score" [class]="'checklist-score--' + scoreColor(scoreFormActual)">{{ scoreFormActual }}/5 condiciones</span>
+        </div>
+        <div class="condiciones-list">
+          @for (c of condiciones; track c.key) {
+            <label class="condicion-row" [class.condicion-row--checked]="formCrear[c.key]">
+              <input type="checkbox" class="sr-only-input" [checked]="formCrear[c.key]" (change)="toggleCondicion(c.key)" />
+              <span class="condicion-check" aria-hidden="true">
+                @if (formCrear[c.key]) {
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                }
+              </span>
+              <span class="condicion-text">
+                <span class="condicion-text__title">{{ c.icon }} {{ c.label }}</span>
+                <span class="condicion-text__desc">{{ c.desc }}</span>
+              </span>
+            </label>
+          }
+        </div>
+      </div>
+
+      <div class="drawer-footer">
+        <button class="btn-cancel" (click)="closeCrear()" type="button" [disabled]="loadingCrear">Cancelar</button>
+        <button class="btn-confirm" [disabled]="loadingCrear" (click)="submitCrear()" type="button">
+          @if (loadingCrear) {
+            <span class="spinner-sm"></span> Registrando…
+          } @else {
+            Registrar punto
+          }
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ══════════════════════ DRAWER: DETALLE ══════════════════════ -->
+  <div class="drawer-overlay" [class.drawer-overlay--open]="!!detalle" role="button" tabindex="0"
+    aria-label="Cerrar detalle del punto"
+    (click)="closeDetalle()" (keydown.enter)="closeDetalle()" (keydown.escape)="closeDetalle()"></div>
+  @if (detalle) {
+    <div class="drawer drawer--open" role="dialog" aria-modal="true" aria-labelledby="detallePuntoTitle">
+      <div class="drawer-header">
+        <div>
+          <div class="drawer-title" id="detallePuntoTitle">{{ detalle.nombre }}</div>
+          <div class="drawer-subtitle">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            {{ detalle.ciudad }}, {{ detalle.departamento }}
+          </div>
+        </div>
+        <button class="icon-btn" (click)="closeDetalle()" type="button" aria-label="Cerrar">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="drawer-body">
+        @if (detalle.coordenadasLat && detalle.coordenadasLng) {
+          <div class="map-preview map-preview--lg">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>{{ detalle.coordenadasLat }}, {{ detalle.coordenadasLng }}</span>
+            @if (detalle.urlMaps) {
+              <a [href]="detalle.urlMaps" target="_blank" rel="noreferrer" class="map-preview__link">Abrir ↗</a>
+            }
+          </div>
+        } @else {
+          <div class="map-preview map-preview--empty">Sin coordenadas GPS registradas</div>
+        }
+
+        <div class="info-box">
+          <div class="info-box__label">Ubicación</div>
+          <div class="grid-2 grid-2--gap-sm">
+            <div>
+              <div class="mini-label">Departamento</div>
+              <div class="mini-value">{{ detalle.departamento }}</div>
+            </div>
+            <div>
+              <div class="mini-label">Ciudad</div>
+              <div class="mini-value">{{ detalle.ciudad }}</div>
+            </div>
+            <div class="grid-2--span">
+              <div class="mini-label">Dirección</div>
+              <div class="mini-value">{{ detalle.direccion }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="checklist-header">
+            <div class="section-label section-label--flush">Checklist logístico</div>
+            <span class="checklist-score" [class]="'checklist-score--' + scoreColor(score(detalle))">
+              {{ score(detalle) === 5 ? '✅ Óptimo' : score(detalle) >= 3 ? '⚠️ Parcial' : '❌ Insuficiente' }} · {{ score(detalle) }}/5
+            </span>
+          </div>
+          <div class="condiciones-list">
+            @for (c of condiciones; track c.key) {
+              <div class="condicion-row condicion-row--readonly" [class.condicion-row--checked]="detalle[c.key]">
+                <span class="condicion-check condicion-check--readonly" [class.condicion-check--on]="detalle[c.key]">
+                  @if (detalle[c.key]) {
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  } @else {
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  }
+                </span>
+                <span class="condicion-text">
+                  <span class="condicion-text__title">{{ c.icon }} {{ c.label }}</span>
+                  <span class="condicion-text__desc">{{ c.desc }}</span>
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</div>
