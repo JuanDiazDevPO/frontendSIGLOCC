@@ -59,7 +59,7 @@ export class Navtab {
     // nivel jerárquico (ENL, ERLE o ERL).
     { section: 'Gestión Financiera', area: 'RECURSOS' },
     { icon: '💰', label: 'Anticipos',            route: '/anticipos/crear',        area: 'RECURSOS' },
-    { icon: '🏦', label: 'Gestión de anticipos', route: null,                      area: 'RECURSOS' }, // fila 8, aún sin pantalla
+    { icon: '🏦', label: 'Gestión de anticipos', route: '/anticipos/gestion',      roles: ['ENL_RECURSOS'] },
     { icon: '📊', label: 'Presupuestos',         route: '/presupuestos/crear',     roles: ['ENL_RECURSOS'] },
     { icon: '📝', label: 'Reporte de gastos',    route: '/reportes/mensual',       area: 'RECURSOS' },
     { icon: '✅', label: 'Gestión de reportes',  route: '/reportes/gestion',       area: 'RECURSOS' },

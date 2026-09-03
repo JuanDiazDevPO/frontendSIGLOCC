@@ -43,6 +43,13 @@ export const routes: Routes = [
         .then(m => m.CrearPresupuestoComponent)
   },
   {
+    path: 'anticipos/gestion',
+    canActivate: [authGuard, roleGuard('ENL_RECURSOS')],
+    loadComponent: () =>
+      import('./gestion-anticipos/gestion-anticipos.component')
+        .then(m => m.GestionAnticiposComponent)
+  },
+  {
     path: 'temporadas/parametros',
     canActivate: [authGuard, roleGuard('ENL_RECURSOS', 'ENL_LOGISTICA', 'ADMIN')],
     loadComponent: () =>
