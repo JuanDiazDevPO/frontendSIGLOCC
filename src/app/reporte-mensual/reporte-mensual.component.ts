@@ -8,9 +8,17 @@ import { SessionService } from '../session.service';
 import { Usuario } from '../auth.models';
 import { environment } from '../../environments/environment';
 
+type Familia = 'E' | 'M' | 'O';
+
+interface CategoriaApi {
+  codigo: string;
+  familia: string;
+  nombreLargo: string;
+}
+
 export interface Categoria {
   codigo: string;
-  familia: 'E' | 'M' | 'O';
+  familia: Familia;
   nombre: string;
   icon: string;
 }
@@ -18,7 +26,6 @@ export interface Categoria {
 export interface FamiliaInfo {
   label: string;
   icon: string;
-  bucket: string;
   colorClass: string;
 }
 
@@ -55,6 +62,7 @@ interface ReporteResult {
   mesNombre: string;
   anio: number;
   total: number;
+  avisoSoporte?: string;
 }
 
 interface MisSaldosBucket {
@@ -71,24 +79,21 @@ interface MisSaldosResponse {
   mentoreo: MisSaldosBucket;
 }
 
-const CATEGORIAS: Categoria[] = [
-  { codigo: 'E-0', familia: 'E', nombre: 'Materiales de entrenamiento',   icon: '📦' },
-  { codigo: 'E-1', familia: 'E', nombre: 'Refrigerios punto de venta',    icon: '🍪' },
-  { codigo: 'E-2', familia: 'E', nombre: 'Transporte entrenamiento',      icon: '🚐' },
-  { codigo: 'E-3', familia: 'E', nombre: 'Alquiler de espacios PV',       icon: '🏛️' },
-  { codigo: 'E-4', familia: 'E', nombre: 'Materiales capacitación OCC',   icon: '📚' },
-  { codigo: 'E-5', familia: 'E', nombre: 'Refrigerios capacitación',      icon: '☕' },
-  { codigo: 'M-1', familia: 'M', nombre: 'Transporte mentoría',           icon: '🚗' },
-  { codigo: 'M-2', familia: 'M', nombre: 'Refrigerios mentoría',          icon: '🥤' },
-  { codigo: 'M-3', familia: 'M', nombre: 'Materiales mentoría',           icon: '📋' },
-  { codigo: 'M-4', familia: 'M', nombre: 'Alquiler de espacios mentoría', icon: '🏢' },
-  { codigo: 'O-1', familia: 'O', nombre: 'Gastos administrativos varios', icon: '📁' },
-];
+// Los nombres y códigos vienen de GET /v1/reportes/categorias; el icono es solo presentación
+// y se resuelve por código, con un genérico de respaldo si el backend agrega categorías nuevas.
+const CATEGORIA_ICONS: Record<string, string> = {
+  'E-0': '🏦', 'E-1': '🚐', 'E-2': '🍪', 'E-3': '🍽️', 'E-4': '📁', 'E-5': '🏛️',
+  'M-0': '🏦', 'M-1': '🚗', 'M-2': '🍽️', 'M-3': '🏨', 'M-4': '📋',
+  'O-1': '🎪', 'O-2': '🧰',
+};
+const CATEGORIA_ICON_FALLBACK = '📄';
 
-const FAMILIA_INFO: Record<'E' | 'M' | 'O', FamiliaInfo> = {
-  E: { label: 'Entrenamiento', icon: '📚', bucket: 'entrenamiento', colorClass: 'familia-E' },
-  M: { label: 'Mentoría',      icon: '🤝', bucket: 'mentoreo',      colorClass: 'familia-M' },
-  O: { label: 'Otros',         icon: '📋', bucket: 'otros',         colorClass: 'familia-O' },
+// El techo se valida sobre dos bolsas: entrenamiento (familia E) y mentoreo (familias M y O
+// juntas), que son las únicas que expone mis-saldos.
+const FAMILIA_INFO: Record<Familia, FamiliaInfo> = {
+  E: { label: 'Entrenamiento', icon: '📚', colorClass: 'familia-E' },
+  M: { label: 'Mentoreo',      icon: '🤝', colorClass: 'familia-M' },
+  O: { label: 'Otros',         icon: '📋', colorClass: 'familia-O' },
 };
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -132,10 +137,13 @@ export class ReporteMensualComponent implements OnInit {
   errorGeneral: string | null = null;
   result: ReporteResult | null = null;
 
-  readonly CATEGORIAS = CATEGORIAS;
+  categorias: Categoria[] = [];
+  categoriasLoading = false;
+  categoriasError: string | null = null;
+
   readonly FAMILIA_INFO = FAMILIA_INFO;
   readonly MESES = MESES;
-  readonly FAMILIAS: ('E' | 'M' | 'O')[] = ['E', 'M', 'O'];
+  readonly FAMILIAS: Familia[] = ['E', 'M', 'O'];
 
   readonly LOCK_REASONS: Partial<Record<'E' | 'M' | 'O', string>> = {
     M: 'Los equipos ERL solo pueden reportar gastos de entrenamiento (familia E). El ERLE de tu región gestiona los rubros de Mentoría.',
@@ -155,6 +163,8 @@ export class ReporteMensualComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.cargarCategorias();
+
     this.temporadasLoading = true;
     this.http
       .get<Temporada[]>(`${environment.apiUrl}/v1/temporadas`)
@@ -192,19 +202,44 @@ export class ReporteMensualComponent implements OnInit {
       });
   }
 
-  categoriasByFamilia(f: 'E' | 'M' | 'O'): Categoria[] {
-    return CATEGORIAS.filter(c => c.familia === f);
+  cargarCategorias(): void {
+    this.categoriasLoading = true;
+    this.categoriasError = null;
+    this.http
+      .get<CategoriaApi[]>(`${environment.apiUrl}/v1/reportes/categorias`)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: data => {
+          this.categorias = data.map(c => ({
+            codigo: c.codigo,
+            familia: c.familia as Familia,
+            nombre: c.nombreLargo,
+            icon: CATEGORIA_ICONS[c.codigo] ?? CATEGORIA_ICON_FALLBACK,
+          }));
+          this.categoriasLoading = false;
+          this.cdr.detectChanges();
+        },
+        error: () => {
+          this.categoriasError = 'No se pudieron cargar las categorías de gasto.';
+          this.categoriasLoading = false;
+          this.cdr.detectChanges();
+        },
+      });
   }
 
-  isFamiliaLocked(f: 'E' | 'M' | 'O'): boolean {
+  categoriasByFamilia(f: Familia): Categoria[] {
+    return this.categorias.filter(c => c.familia === f);
+  }
+
+  isFamiliaLocked(f: Familia): boolean {
     return this.isErl && f !== 'E';
   }
 
   getMontoNum(codigo: string): number {
-    return parseFloat(this.montos[codigo]) || 0;
+    return Number.parseFloat(this.montos[codigo]) || 0;
   }
 
-  totalByFamilia(f: 'E' | 'M' | 'O'): number {
+  totalByFamilia(f: Familia): number {
     return this.categoriasByFamilia(f).reduce((s, c) => s + this.getMontoNum(c.codigo), 0);
   }
 
@@ -213,8 +248,11 @@ export class ReporteMensualComponent implements OnInit {
   get totalO(): number { return this.totalByFamilia('O'); }
   get totalGastado(): number { return this.totalE + this.totalM + this.totalO; }
 
+  // El backend agrupa Mentoreo y Otros en la misma bolsa, así que el techo se valida sobre la suma.
+  get totalMO(): number { return this.totalM + this.totalO; }
+
   get hayDetalles(): boolean {
-    return Object.values(this.montos).some(v => parseFloat(v) > 0);
+    return Object.values(this.montos).some(v => Number.parseFloat(v) > 0);
   }
 
   get selectedTemporada(): Temporada | undefined {
@@ -234,17 +272,36 @@ export class ReporteMensualComponent implements OnInit {
     return !!this.saldos && this.totalE > this.saldos.entrenamiento.disponible;
   }
 
-  get excedeSaldoM(): boolean {
-    return !this.isErl && !!this.saldos && this.totalM > this.saldos.mentoreo.disponible;
+  get excedeSaldoMO(): boolean {
+    return !this.isErl && !!this.saldos && this.totalMO > this.saldos.mentoreo.disponible;
   }
 
   get excedeSaldo(): boolean {
-    return this.excedeSaldoE || this.excedeSaldoM;
+    return this.excedeSaldoE || this.excedeSaldoMO;
   }
 
-  saldoBarPct(bucket: MisSaldosBucket | undefined, thisReport: number): number {
+  // Barra apilada: lo ya ejecutado, lo que suma este reporte y —si se pasa— el sobregasto.
+  pctEjecutado(bucket: MisSaldosBucket | undefined): number {
     if (!bucket?.presupuesto) return 0;
-    return Math.min(100, ((bucket.ejecutado + thisReport) / bucket.presupuesto) * 100);
+    return Math.min(100, (bucket.ejecutado / bucket.presupuesto) * 100);
+  }
+
+  pctEsteReporte(bucket: MisSaldosBucket | undefined, thisReport: number): number {
+    if (!bucket?.presupuesto) return 0;
+    const dentroDelSaldo = Math.min(thisReport, Math.max(bucket.disponible, 0));
+    return Math.min(100, (dentroDelSaldo / bucket.presupuesto) * 100);
+  }
+
+  pctSobregasto(bucket: MisSaldosBucket | undefined, thisReport: number): number {
+    if (!bucket?.presupuesto) return 0;
+    const exceso = thisReport - Math.max(bucket.disponible, 0);
+    if (exceso <= 0) return 0;
+    return Math.min(100, (exceso / bucket.presupuesto) * 100);
+  }
+
+  pctDelPresupuesto(bucket: MisSaldosBucket | undefined, thisReport: number): number {
+    if (!bucket?.presupuesto) return 0;
+    return Math.min(999, Math.round(((bucket.ejecutado + thisReport) / bucket.presupuesto) * 100));
   }
 
   cop(n: number): string {
@@ -273,14 +330,14 @@ export class ReporteMensualComponent implements OnInit {
     this.errorGeneral = null;
 
     const detalles: ReporteDetalle[] = Object.entries(this.montos)
-      .filter(([, v]) => parseFloat(v) > 0)
+      .filter(([, v]) => Number.parseFloat(v) > 0)
       .map(([categoriaCodigo, v]) => ({
         categoriaCodigo,
-        montoGastado: parseFloat(v),
+        montoGastado: Number.parseFloat(v),
       }));
 
     const body: ReporteRequest = {
-      temporadaId: parseInt(this.periodo.temporadaId),
+      temporadaId: Number.parseInt(this.periodo.temporadaId, 10),
       mes:         this.periodo.mes,
       anio:        this.periodo.anio,
       detalles,
@@ -295,21 +352,55 @@ export class ReporteMensualComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: res => {
-          this.loading = false;
-          this.result  = {
-            id: res.id,
-            estado: res.estado,
-            temporadaNombre,
-            mesNombre,
-            anio:  this.periodo.anio,
-            total,
+          const finalizar = (estado: string, avisoSoporte?: string) => {
+            this.loading = false;
+            this.result = {
+              id: res.id,
+              estado,
+              temporadaNombre,
+              mesNombre,
+              anio: this.periodo.anio,
+              total,
+              avisoSoporte,
+            };
+            this.cdr.detectChanges();
           };
-          this.cdr.detectChanges();
+
+          // El soporte se sube aparte: es el paso que mueve el reporte de BORRADOR a PENDIENTE_ERLE.
+          if (this.soporteFile) {
+            this.subirSoporte(res.id, this.soporteFile, finalizar, res.estado);
+          } else {
+            finalizar(res.estado);
+          }
         },
         error: (err: HttpErrorResponse) => {
           this.loading      = false;
           this.errorGeneral = this.httpErrorMessage(err);
           this.cdr.detectChanges();
+        },
+      });
+  }
+
+  private subirSoporte(
+    reporteId: number,
+    file: File,
+    finalizar: (estado: string, avisoSoporte?: string) => void,
+    estadoSinSoporte: string,
+  ): void {
+    const formData = new FormData();
+    formData.append('archivo', file);
+
+    this.http
+      .put<ReporteApiResponse>(`${environment.apiUrl}/v1/reportes/${reporteId}/soporte`, formData)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: conSoporte => finalizar(conSoporte.estado),
+        error: (err: HttpErrorResponse) => {
+          // El reporte sí quedó creado; solo falló el adjunto, así que se informa sin perderlo.
+          finalizar(
+            estadoSinSoporte,
+            `El reporte se creó, pero no se pudo adjuntar el soporte: ${this.httpErrorMessage(err)} Puedes volver a subirlo desde Gestión de reportes.`,
+          );
         },
       });
   }
