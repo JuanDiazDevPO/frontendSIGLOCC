@@ -450,6 +450,20 @@
 
 .empty-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.5; }
 
+.link-btn {
+  display: block;
+  margin: 8px auto 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 /* ── Status badge ────────────────────────────────────────── */
 .status-badge {
   display: inline-flex;
@@ -1061,6 +1075,20 @@
   background: #f9fafb;
   cursor: pointer;
   text-align: center;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dropzone:hover,
+.dropzone:focus-visible {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 5%, #f9fafb);
+}
+
+.dropzone--dragging {
+  border-color: var(--color-primary);
+  border-style: solid;
+  background: color-mix(in srgb, var(--color-primary) 10%, #f9fafb);
 }
 
 .dropzone:hover { background: #f3f4f6; }
