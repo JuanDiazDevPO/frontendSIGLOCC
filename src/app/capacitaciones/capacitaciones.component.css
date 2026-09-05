@@ -44,7 +44,9 @@ input[type="date"].form-input { appearance: auto; }
 .result-count { margin-left: auto; font-size: 13px; color: var(--color-text-muted); }
 
 /* ── Table ───────────────────────────────────────────────── */
-.table-card { background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; }
+.table-card { background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden;
+  flex-shrink: 0;
+}
 .table-scroll { overflow-x: auto; }
 .caps-table { width: 100%; border-collapse: collapse; min-width: 780px; }
 .caps-table thead tr { background: #f9fafb; }

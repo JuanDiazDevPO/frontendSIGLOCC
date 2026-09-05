@@ -168,6 +168,7 @@
   border-radius: 12px;
   border: 1px solid #e5e7eb;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .table-card__head {
@@ -350,6 +351,7 @@
   border-radius: 14px;
   border: 1px solid #e5e7eb;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .run-card__head {

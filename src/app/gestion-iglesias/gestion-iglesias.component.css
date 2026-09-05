@@ -59,7 +59,9 @@
 .result-count { margin-left: auto; font-size: 13px; color: var(--color-text-muted); }
 
 /* ── Table ───────────────────────────────────────────────── */
-.table-card { background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; }
+.table-card { background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden;
+  flex-shrink: 0;
+}
 .table-scroll { overflow-x: auto; }
 .iglesias-table { width: 100%; border-collapse: collapse; min-width: 820px; }
 .iglesias-table thead tr { background: #f9fafb; }
