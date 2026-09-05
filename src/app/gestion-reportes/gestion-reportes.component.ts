@@ -239,6 +239,14 @@ export class GestionReportesComponent implements OnInit {
           if (this.temporadaSeleccionada !== temporadaId) return;
           this.reportes = data;
           this.reportesLoading = false;
+          // "Tu bandeja" (pendientes_mios) es el default para ERLE/ENL, pero cuando no hay nada
+          // esperando su revisión la pantalla queda vacía y las acciones sobre otros reportes
+          // (subir soporte a un BORRADOR, por ejemplo) resultan inalcanzables. Si la bandeja
+          // está vacía y sí hay reportes, se cae a "Todos" para no dejar la pantalla muerta.
+          if (this.filtroEstado === 'pendientes_mios' && data.length > 0
+              && !data.some(r => r.estado === this.estadoPendienteMio)) {
+            this.filtroEstado = 'todos';
+          }
           this.cdr.markForCheck();
         },
         error: () => {
@@ -249,6 +257,7 @@ export class GestionReportesComponent implements OnInit {
         },
       });
   }
+
 
   equipoNombre(id: number): string {
     return this.equipos.find(e => e.id === id)?.nombre ?? `Equipo #${id}`;
@@ -350,6 +359,12 @@ export class GestionReportesComponent implements OnInit {
     this.persistirFiltros();
   }
 
+  // Salida del estado vacío: limpia filtro y búsqueda para volver a ver todo.
+  verTodos(): void {
+    this.search = '';
+    this.setFiltro('todos');
+  }
+
   onSearchChange(valor: string): void {
     this.search = valor;
     this.paginaActual = 1;
@@ -368,6 +383,9 @@ export class GestionReportesComponent implements OnInit {
   // que pueda ver el reporte (la visibilidad ya la resuelve el backend/rolScope).
   puedeSubirSoporte(r: Reporte): boolean {
     return r.estado === 'BORRADOR';
+  }
+  equipoReporte(r: Reporte):boolean {
+    return r.equipoId === this.user?.equipoId;
   }
 
   // Corregir un reporte RECHAZADO sigue siendo exclusivo del ERL dueño del equipo.
@@ -549,8 +567,39 @@ export class GestionReportesComponent implements OnInit {
   }
 
   onSoporteSeleccionado(event: Event): void {
-    const file = (event.target as HTMLInputElement).files?.[0];
+    this.aceptarSoporte((event.target as HTMLInputElement).files?.[0]);
+  }
+
+  // ── Arrastrar y soltar ──────────────────────────────────────
+  arrastrando = false;
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault(); // sin esto el navegador abre el archivo en vez de permitir el drop
+    if (this.arrastrando) return;
+    this.arrastrando = true;
+    this.cdr.markForCheck();
+  }
+
+  onDragLeave(): void {
+    this.arrastrando = false;
+    this.cdr.markForCheck();
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.arrastrando = false;
+    this.aceptarSoporte(event.dataTransfer?.files?.[0]);
+  }
+
+  // Validación compartida entre el selector de archivos y el drop.
+  private aceptarSoporte(file: File | undefined): void {
     if (!file) return;
+    const nombre = file.name.toLowerCase();
+    if (!nombre.endsWith('.pdf') && !nombre.endsWith('.zip')) {
+      this.soporteError = 'Solo se admiten archivos PDF o ZIP.';
+      this.soporteFile = null;
+      return;
+    }
     if (file.size > MAX_SOPORTE_BYTES) {
       this.soporteError = 'El archivo supera el máximo de 20 MB.';
       this.soporteFile = null;
@@ -558,6 +607,7 @@ export class GestionReportesComponent implements OnInit {
     }
     this.soporteError = null;
     this.soporteFile = file;
+    this.cdr.markForCheck();
   }
 
   quitarSoporteFile(): void {

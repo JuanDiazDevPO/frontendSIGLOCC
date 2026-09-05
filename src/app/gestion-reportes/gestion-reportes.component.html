@@ -20,18 +20,7 @@
           @if (temporadasError) { <span class="field-error">⚠ {{ temporadasError }}</span> }
         </div>
       </div>
-      @if (isDev) {
-        <div class="topbar-dev">
-          <label class="field-label-inline" for="rolDevSelect">👁 Ver como (solo dev)</label>
-          <select id="rolDevSelect" class="form-input form-select form-select--sm"
-            [ngModel]="rolOverride" (ngModelChange)="setRolOverride($event)" name="rolDevSelect">
-            <option value="">Mi rol real</option>
-            <option value="ERL">ERL</option>
-            <option value="ERLE">ERLE</option>
-            <option value="ENL">ENL</option>
-          </select>
-        </div>
-      }
+ 
     </header>
 
     <div class="content">
@@ -178,7 +167,12 @@
                 <tr>
                   <td colspan="8" class="empty-cell">
                     <div class="empty-icon">📋</div>
-                    No hay reportes en esta categoría
+                    @if (reportes.length > 0) {
+                      Ningún reporte coincide con este filtro.
+                      <button class="link-btn" (click)="verTodos()" type="button">Ver los {{ reportes.length }} reportes</button>
+                    } @else {
+                      No hay reportes en esta temporada
+                    }
                   </td>
                 </tr>
               } @else {
@@ -226,7 +220,7 @@
                           [attr.aria-label]="r.estado === 'RECHAZADO' ? 'Corregir reporte' : 'Subir soporte'" [attr.title]="r.estado === 'RECHAZADO' ? 'Corregir reporte' : 'Subir soporte'">
                           @if (r.estado === 'RECHAZADO') {
                             ✏️ Corregir
-                          } @else {
+                          } @else if(equipoReporte(r)) {
                             📎 Subir soporte
                           }
                         </button>
@@ -537,8 +531,17 @@
             <div class="info-note">
               Adjunta un archivo <strong>PDF o ZIP</strong> con las facturas y evidencias de los gastos reportados. Al subirlo, el reporte pasa automáticamente a <strong>PENDIENTE_ERLE</strong>.
             </div>
-            <label class="dropzone" [class.dropzone--filled]="soporteFile">
-              <input type="file" accept=".pdf,.zip" class="sr-only-input" (change)="onSoporteSeleccionado($event)" />
+            <div class="dropzone" [class.dropzone--filled]="soporteFile" [class.dropzone--dragging]="arrastrando"
+              role="button" tabindex="0" aria-label="Seleccionar archivo de soporte"
+              (click)="soporteInput.click()"
+              (keydown.enter)="soporteInput.click()"
+              (keydown.space)="$event.preventDefault(); soporteInput.click()"
+              (dragover)="onDragOver($event)" (dragleave)="onDragLeave()" (drop)="onDrop($event)">
+              <!-- stopPropagation: el input vive dentro del dropzone, así que su click sintético
+                   burbujearía de vuelta al contenedor y volvería a invocar input.click(), y esa
+                   reentrada hace que el navegador cancele el selector de archivos. -->
+              <input #soporteInput type="file" accept=".pdf,.zip" class="sr-only-input"
+                (click)="$event.stopPropagation()" (change)="onSoporteSeleccionado($event)" />
               @if (soporteFile) {
                 <div class="dropzone__file">
                   <div class="dropzone__file-icon">
@@ -546,16 +549,16 @@
                   </div>
                   <div class="dropzone__file-name">{{ soporteFile.name }}</div>
                   <div class="dropzone__file-size">{{ (soporteFile.size / 1024).toFixed(1) }} KB</div>
-                  <button class="btn-outline-sm" (click)="$event.preventDefault(); quitarSoporteFile()" type="button">Cambiar archivo</button>
+                  <button class="btn-outline-sm" (click)="$event.stopPropagation(); quitarSoporteFile()" type="button">Cambiar archivo</button>
                 </div>
               } @else {
                 <div class="dropzone__empty">
                   <span class="dropzone__icon">📤</span>
-                  <span class="dropzone__title">Haz clic para seleccionar archivo</span>
+                  <span class="dropzone__title">Haz clic o arrastra el archivo aquí</span>
                   <span class="dropzone__hint">PDF o ZIP · máximo 20 MB</span>
                 </div>
               }
-            </label>
+            </div>
             @if (soporteError) { <div class="field-error">⚠ {{ soporteError }}</div> }
           } @else {
             <div class="warning-box">
