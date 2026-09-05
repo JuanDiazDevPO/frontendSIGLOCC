@@ -215,12 +215,12 @@
                             Aprobar
                           </button>
                         </div>
-                      } @else if (puedeSubirSoporte(r) || puedeCorregir(r)) {
+                      } @else if ((puedeSubirSoporte(r) || puedeCorregir(r))&& equipoReporte(r)) {
                         <button class="btn-row-edit" [class.btn-row-edit--danger]="r.estado === 'RECHAZADO'" (click)="r.estado === 'RECHAZADO' ? openErlModal(r, 'corregir') : openErlModal(r, 'soporte')" type="button"
                           [attr.aria-label]="r.estado === 'RECHAZADO' ? 'Corregir reporte' : 'Subir soporte'" [attr.title]="r.estado === 'RECHAZADO' ? 'Corregir reporte' : 'Subir soporte'">
                           @if (r.estado === 'RECHAZADO') {
                             ✏️ Corregir
-                          } @else if(equipoReporte(r)) {
+                          } @else {
                             📎 Subir soporte
                           }
                         </button>
