@@ -25,6 +25,9 @@
               <div class="result-box__period">{{ result.mesNombre }} {{ result.anio }} · {{ cop(result.total) }}</div>
             </div>
           </div>
+          @if (result.avisoSoporte) {
+            <div class="result-warning">⚠ {{ result.avisoSoporte }}</div>
+          }
           <button class="btn-primary result-btn" (click)="reset()" type="button">Crear otro reporte</button>
         </div>
       </div>
@@ -35,8 +38,7 @@
         <div>
           <div class="topbar-heading">Reporte de gastos</div>
           <div class="topbar-sub">
-            <code class="endpoint-badge">POST /api/v1/reportes</code>
-            <span class="topbar-note">· El <code>equipoId</code> se toma del JWT</span>
+            <span class="topbar-note">Registra los gastos del mes por rubro. El equipo se toma de tu sesión.</span>
           </div>
         </div>
       </header>
@@ -122,8 +124,20 @@
               </div>
             </div>
 
-            <!-- ── Familia E ── -->
+            <!-- ── Rubros por familia (categorías reales del backend) ── -->
+            @if (categoriasLoading) {
+              <div class="familia-section familia-loading">
+                <span class="spinner-sm spinner-sm--dark"></span> Cargando categorías de gasto…
+              </div>
+            } @else if (categoriasError) {
+              <div class="error-banner">
+                ⚠ {{ categoriasError }}
+                <button class="btn-retry" type="button" (click)="cargarCategorias()">Reintentar</button>
+              </div>
+            }
+
             @for (familia of FAMILIAS; track familia) {
+              @if (categoriasByFamilia(familia).length > 0) {
               <div class="familia-section" [class.familia-section--locked]="isFamiliaLocked(familia)">
 
                 <!-- Header -->
@@ -138,7 +152,6 @@
                       </div>
                       <div class="familia-header__meta" [ngClass]="isFamiliaLocked(familia) ? 'familia-header__meta--locked' : 'familia-header__meta--' + familia">
                         Familia {{ familia }} · {{ categoriasByFamilia(familia).length }} categorías
-                        · <em>bucket: {{ FAMILIA_INFO[familia].bucket }}</em>
                       </div>
                     </div>
                   </div>
@@ -175,7 +188,9 @@
                       </div>
                       <div class="rubro-row__input-wrap">
                         <span class="rubro-row__prefix">$</span>
+                        <label class="sr-only" [for]="'monto-' + cat.codigo">Monto de {{ cat.nombre }}</label>
                         <input
+                          [id]="'monto-' + cat.codigo"
                           class="rubro-input"
                           [class.rubro-input--filled]="getMontoNum(cat.codigo) > 0"
                           [(ngModel)]="montos[cat.codigo]"
@@ -204,6 +219,7 @@
                 }
 
               </div>
+              }
             }
 
             <!-- Soporte de gastos -->
@@ -217,17 +233,23 @@
             <!-- Techo presupuestal -->
             <div class="sidebar-section-title">Techo presupuestal</div>
             <div class="sidebar-note">
-              El backend valida que tus gastos no superen el saldo. Fuente:
-              <code class="inline-code">vista_control_saldos_enl</code>.
+              El backend valida que tus gastos no superen el saldo disponible de cada bolsa.
             </div>
 
+            @if (saldosError) {
+              <div class="error-banner">⚠ {{ saldosError }}</div>
+            }
+
             <!-- Saldo Entrenamiento -->
-            <div class="saldo-card" [class.saldo-card--active]="totalE > 0">
+            <div class="saldo-card" [class.saldo-card--active]="totalE > 0" [class.saldo-card--over]="excedeSaldoE">
               <div class="saldo-card__header">
                 <div class="saldo-card__label">
                   <span>📚</span>
                   <span class="saldo-card__name">Entrenamiento (E)</span>
                 </div>
+                @if (excedeSaldoE) {
+                  <span class="saldo-over-badge">⚠ SOBREGASTO</span>
+                }
               </div>
               <div class="saldo-card__cols">
                 <div class="saldo-col">
@@ -250,11 +272,21 @@
                 </div>
               </div>
               <div class="saldo-bar-track">
-                <div class="saldo-bar-fill saldo-bar-fill--E" [style.width.%]="saldoBarPct(saldos?.entrenamiento, totalE)"></div>
+                <div class="saldo-bar-fill saldo-bar-fill--ejecutado" [style.width.%]="pctEjecutado(saldos?.entrenamiento)"></div>
+                <div class="saldo-bar-fill saldo-bar-fill--E" [style.width.%]="pctEsteReporte(saldos?.entrenamiento, totalE)"></div>
+                <div class="saldo-bar-fill saldo-bar-fill--over" [style.width.%]="pctSobregasto(saldos?.entrenamiento, totalE)"></div>
               </div>
+              @if (saldos) {
+                <div class="saldo-card__foot">
+                  <span>Ejecutado: {{ cop(saldos.entrenamiento.ejecutado) }}</span>
+                  <span class="saldo-card__pct" [class.saldo-card__pct--over]="pctDelPresupuesto(saldos.entrenamiento, totalE) >= 100">
+                    {{ pctDelPresupuesto(saldos.entrenamiento, totalE) }}% del presupuesto
+                  </span>
+                </div>
+              }
             </div>
 
-            <!-- Saldo Mentoría (locked for ERL) -->
+            <!-- Saldo Mentoreo + Otros (una sola bolsa en el backend; bloqueado para ERL) -->
             @if (isErl) {
               <div class="saldo-card saldo-card--locked">
                 <div class="saldo-locked-icon">
@@ -263,17 +295,20 @@
                   </svg>
                 </div>
                 <div>
-                  <div class="saldo-locked-name">Mentoría (M)</div>
+                  <div class="saldo-locked-name">Mentoreo + Otros (M+O)</div>
                   <div class="saldo-locked-sub">No disponible para este rol</div>
                 </div>
               </div>
             } @else {
-              <div class="saldo-card" [class.saldo-card--active]="totalM > 0">
+              <div class="saldo-card" [class.saldo-card--active]="totalMO > 0" [class.saldo-card--over]="excedeSaldoMO">
                 <div class="saldo-card__header">
                   <div class="saldo-card__label">
                     <span>🤝</span>
-                    <span class="saldo-card__name">Mentoría (M)</span>
+                    <span class="saldo-card__name">Mentoreo + Otros (M+O)</span>
                   </div>
+                  @if (excedeSaldoMO) {
+                    <span class="saldo-over-badge">⚠ SOBREGASTO</span>
+                  }
                 </div>
                 <div class="saldo-card__cols">
                   <div class="saldo-col">
@@ -284,64 +319,31 @@
                   </div>
                   <div class="saldo-col">
                     <div class="saldo-col__label">Este reporte</div>
-                    <div class="saldo-col__value saldo-col__value--accent" [class.saldo-col__value--zero]="totalM === 0">
-                      {{ cop(totalM) }}
+                    <div class="saldo-col__value saldo-col__value--accent" [class.saldo-col__value--zero]="totalMO === 0">
+                      {{ cop(totalMO) }}
                     </div>
                   </div>
                   <div class="saldo-col">
                     <div class="saldo-col__label">Queda</div>
-                    <div class="saldo-col__value" [class.saldo-col__value--negative]="excedeSaldoM">
-                      {{ saldosLoading ? '…' : (saldos ? cop(saldos.mentoreo.disponible - totalM) : '—') }}
+                    <div class="saldo-col__value" [class.saldo-col__value--negative]="excedeSaldoMO">
+                      {{ saldosLoading ? '…' : (saldos ? cop(saldos.mentoreo.disponible - totalMO) : '—') }}
                     </div>
                   </div>
                 </div>
                 <div class="saldo-bar-track">
-                  <div class="saldo-bar-fill saldo-bar-fill--M" [style.width.%]="saldoBarPct(saldos?.mentoreo, totalM)"></div>
+                  <div class="saldo-bar-fill saldo-bar-fill--ejecutado" [style.width.%]="pctEjecutado(saldos?.mentoreo)"></div>
+                  <div class="saldo-bar-fill saldo-bar-fill--M" [style.width.%]="pctEsteReporte(saldos?.mentoreo, totalMO)"></div>
+                  <div class="saldo-bar-fill saldo-bar-fill--over" [style.width.%]="pctSobregasto(saldos?.mentoreo, totalMO)"></div>
                 </div>
-              </div>
-            }
-
-            <!-- Saldo Otros (locked for ERL) -->
-            @if (isErl) {
-              <div class="saldo-card saldo-card--locked">
-                <div class="saldo-locked-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                </div>
-                <div>
-                  <div class="saldo-locked-name">Otros (O)</div>
-                  <div class="saldo-locked-sub">No disponible para este rol</div>
-                </div>
-              </div>
-            } @else {
-            <div class="saldo-card" [class.saldo-card--active]="totalO > 0">
-              <div class="saldo-card__header">
-                <div class="saldo-card__label">
-                  <span>📋</span>
-                  <span class="saldo-card__name">Otros (O)</span>
-                </div>
-              </div>
-              <div class="saldo-card__cols">
-                <div class="saldo-col">
-                  <div class="saldo-col__label">Disponible</div>
-                  <div class="saldo-col__value">—</div>
-                </div>
-                <div class="saldo-col">
-                  <div class="saldo-col__label">Este reporte</div>
-                  <div class="saldo-col__value saldo-col__value--accent" [class.saldo-col__value--zero]="totalO === 0">
-                    {{ cop(totalO) }}
+                @if (saldos) {
+                  <div class="saldo-card__foot">
+                    <span>Ejecutado: {{ cop(saldos.mentoreo.ejecutado) }}</span>
+                    <span class="saldo-card__pct" [class.saldo-card__pct--over]="pctDelPresupuesto(saldos.mentoreo, totalMO) >= 100">
+                      {{ pctDelPresupuesto(saldos.mentoreo, totalMO) }}% del presupuesto
+                    </span>
                   </div>
-                </div>
-                <div class="saldo-col">
-                  <div class="saldo-col__label">Queda</div>
-                  <div class="saldo-col__value">—</div>
-                </div>
+                }
               </div>
-              <div class="saldo-bar-track">
-                <div class="saldo-bar-fill saldo-bar-fill--O" [style.width.%]="totalO > 0 ? 60 : 0"></div>
-              </div>
-            </div>
             }
 
             <!-- Resumen -->
