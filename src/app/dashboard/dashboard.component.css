@@ -302,6 +302,7 @@
   border-radius: 12px;
   border: 1px solid #e9eaec;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .table-header {

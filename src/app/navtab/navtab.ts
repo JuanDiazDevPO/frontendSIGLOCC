@@ -48,12 +48,11 @@ export class Navtab {
   private readonly allNavItems: NavItem[] = [
     { icon: '◈', label: 'Dashboard', route: '/dashboard' },
 
-    // Módulo Core: filas 1-4 de la matriz — solo ENL (cualquier sufijo) o ADMIN.
+    // Módulo Core: filas 1-3 de la matriz — solo ENL (cualquier sufijo) o ADMIN.
     { section: 'Administración', roles: CORE_ROLES },
     { icon: '👥', label: 'Usuarios',   route: '/usuarios',              roles: CORE_ROLES },
     { icon: '⊞', label: 'Temporadas', route: null,                     roles: CORE_ROLES },
     { icon: '⚙', label: 'Parámetros', route: '/temporadas/parametros', roles: CORE_ROLES },
-    { icon: '🛡️', label: 'Auditoría',  route: null,                     roles: CORE_ROLES }, // fila 4, aún sin pantalla ("no esta" en la matriz)
 
     // Módulo Financiero: solo visible para roles _RECURSOS, sin importar el
     // nivel jerárquico (ENL, ERLE o ERL).

@@ -79,12 +79,21 @@ interface MisSaldosResponse {
   mentoreo: MisSaldosBucket;
 }
 
-// Los nombres y códigos vienen de GET /v1/reportes/categorias; el icono es solo presentación
-// y se resuelve por código, con un genérico de respaldo si el backend agrega categorías nuevas.
+// Rubros reportables según el diseño de la pantalla. GET /v1/reportes/categorias devuelve
+// además E-5 ("Alquiler de espacios PV") y O-2 ("Imprevistos"), que existen en el backend para
+// reportes históricos pero no deben ofrecerse al crear uno nuevo. Los nombres siguen saliendo
+// de la API para no volver a desincronizarse; esta lista solo decide cuáles se muestran.
+const RUBROS_REPORTABLES: readonly string[] = [
+  'E-0', 'E-1', 'E-2', 'E-3', 'E-4',
+  'M-0', 'M-1', 'M-2', 'M-3', 'M-4',
+  'O-1',
+];
+
+// El icono es solo presentación (la API no lo expone), con un genérico de respaldo.
 const CATEGORIA_ICONS: Record<string, string> = {
-  'E-0': '🏦', 'E-1': '🚐', 'E-2': '🍪', 'E-3': '🍽️', 'E-4': '📁', 'E-5': '🏛️',
+  'E-0': '🏦', 'E-1': '🚐', 'E-2': '🍪', 'E-3': '🍽️', 'E-4': '📁',
   'M-0': '🏦', 'M-1': '🚗', 'M-2': '🍽️', 'M-3': '🏨', 'M-4': '📋',
-  'O-1': '🎪', 'O-2': '🧰',
+  'O-1': '🎪',
 };
 const CATEGORIA_ICON_FALLBACK = '📄';
 
@@ -210,12 +219,14 @@ export class ReporteMensualComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: data => {
-          this.categorias = data.map(c => ({
-            codigo: c.codigo,
-            familia: c.familia as Familia,
-            nombre: c.nombreLargo,
-            icon: CATEGORIA_ICONS[c.codigo] ?? CATEGORIA_ICON_FALLBACK,
-          }));
+          this.categorias = data
+            .filter(c => RUBROS_REPORTABLES.includes(c.codigo))
+            .map(c => ({
+              codigo: c.codigo,
+              familia: c.familia as Familia,
+              nombre: c.nombreLargo,
+              icon: CATEGORIA_ICONS[c.codigo] ?? CATEGORIA_ICON_FALLBACK,
+            }));
           this.categoriasLoading = false;
           this.cdr.detectChanges();
         },
