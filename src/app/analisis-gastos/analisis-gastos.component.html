@@ -1,0 +1,262 @@
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-heading">Análisis de Gastos</div>
+        <div class="topbar-sub">En qué se está consumiendo el presupuesto · solo reportes APROBADOS</div>
+      </div>
+    
+    </header>
+
+    <div class="content">
+      @if (cargando) {
+        <div class="state-center">
+          <span class="spinner"></span>
+          <span>Cargando análisis…</span>
+        </div>
+      } @else if (errorCarga) {
+        <div class="state-center">
+          <div class="state-icon">⚠️</div>
+          <div class="state-title">{{ errorCarga }}</div>
+          <button class="btn-primary" (click)="reintentar()" type="button">Reintentar</button>
+        </div>
+      } @else if (drill) {
+
+        <!-- ═════════════ DRILL-DOWN POR EQUIPO ═════════════ -->
+        <div class="breadcrumb">
+          <button class="link-btn" (click)="volverAMatriz()" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Matriz de gastos
+          </button>
+          <span class="breadcrumb__sep">/</span>
+          <span class="breadcrumb__actual">{{ drill.equipo.equipoNombre }}</span>
+        </div>
+
+        <div class="drill-head">
+          <div>
+            <div class="drill-title">
+              <span class="tipo-chip" [class]="'tipo-chip--' + drill.equipo.equipoTipo.toLowerCase()">{{ drill.equipo.equipoTipo }}</span>
+              {{ drill.equipo.equipoNombre }}
+            </div>
+            <div class="drill-sub">{{ temporadaNombre }} · {{ periodoLabel }}</div>
+          </div>
+          <button class="btn-outline btn-nowrap" (click)="exportarCsv()" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Excel / CSV
+          </button>
+        </div>
+
+        <div class="saldo-grid" [class.saldo-grid--una]="drill.buckets.length === 1">
+          @for (b of drill.buckets; track b.bucket.id) {
+            <div class="saldo-card">
+              <div class="saldo-card__head">
+                <span class="saldo-card__label">{{ b.bucket.icon }} {{ b.bucket.label }}</span>
+                <span class="pct-badge" [class]="semaforo(b.pct)">{{ b.pct }}%</span>
+              </div>
+              <div class="saldo-card__grid">
+                <div>
+                  <div class="mini-label">Presupuesto</div>
+                  <div class="mini-value">{{ cop(b.presupuesto) }}</div>
+                </div>
+                <div>
+                  <div class="mini-label">Ejecutado</div>
+                  <div class="mini-value mini-value--accent">{{ cop(b.ejecutado) }}</div>
+                </div>
+                <div>
+                  <div class="mini-label">Saldo</div>
+                  <div class="mini-value">{{ cop(b.presupuesto - b.ejecutado) }}</div>
+                </div>
+              </div>
+              <div class="progress">
+                <div class="progress__fill" [class]="semaforo(b.pct)" [style.width.%]="b.pct > 100 ? 100 : b.pct"></div>
+              </div>
+              <div class="saldo-card__api">campo del API: <code>{{ b.bucket.campoSaldo }}</code></div>
+            </div>
+          }
+        </div>
+
+        <div class="table-card">
+          <div class="table-card__head">Rubros con gasto en el período</div>
+          @if (drillRubros.length === 0) {
+            <div class="empty-state">Este equipo no registra gastos aprobados en el período seleccionado.</div>
+          } @else {
+            <div class="table-scroll">
+              <table class="rubros-table">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Rubro</th>
+                    <th>Familia</th>
+                    <th class="col-right">Monto</th>
+                    <th class="col-right">% del bucket</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of drillRubros; track r.categoria.codigo) {
+                    <tr>
+                      <td><code class="cod-chip" [class]="'cod-chip--' + r.categoria.familia">{{ r.categoria.codigo }}</code></td>
+                      <td class="cell-title">{{ r.categoria.nombreLargo }}</td>
+                      <td class="cell-muted">{{ FAMILIA_LABEL[r.categoria.familia].icon }} {{ FAMILIA_LABEL[r.categoria.familia].label }}</td>
+                      <td class="col-right col-monto">{{ cop(r.monto) }}</td>
+                      <td class="col-right cell-muted">{{ r.pctBucket }}%</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+
+      } @else {
+
+        <!-- ═════════════ MATRIZ ═════════════ -->
+        <div class="toolbar">
+          <div class="filtro">
+            <label class="field-label-inline" for="temporadaSelect">Temporada</label>
+            <select id="temporadaSelect" class="form-input form-select form-select--sm"
+              [ngModel]="temporadaSeleccionada" (ngModelChange)="seleccionarTemporada($event)" name="temporadaSelect">
+              @for (t of temporadas; track t.id) {
+                <option [value]="t.id">{{ t.nombre }}{{ t.activa ? ' (actual)' : '' }}</option>
+              }
+            </select>
+          </div>
+          <div class="filtro">
+            <label class="field-label-inline" for="mesIni">Desde</label>
+            <select id="mesIni" class="form-input form-select form-select--sm"
+              [(ngModel)]="mesIni" (ngModelChange)="onRangoMeses()" name="mesIni">
+              @for (m of MESES; track $index) { <option [value]="$index + 1">{{ m }}</option> }
+            </select>
+          </div>
+          <div class="filtro">
+            <label class="field-label-inline" for="mesFin">Hasta</label>
+            <select id="mesFin" class="form-input form-select form-select--sm"
+              [(ngModel)]="mesFin" (ngModelChange)="onRangoMeses()" name="mesFin">
+              @for (m of MESES; track $index) { <option [value]="$index + 1">{{ m }}</option> }
+            </select>
+          </div>
+          <div class="search-wrap">
+            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <label class="sr-only" for="buscarEquipo">Buscar equipo</label>
+            <input id="buscarEquipo" class="search-input" [(ngModel)]="search" (ngModelChange)="onBuscar()" name="buscarEquipo" type="text" placeholder="Buscar equipo…" />
+          </div>
+          <button class="btn-outline btn-nowrap" (click)="exportarCsv()" type="button" [disabled]="filas.length === 0">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Excel / CSV
+          </button>
+        </div>
+
+        <!-- KPIs -->
+        <div class="kpis">
+          <div class="kpi">
+            <div class="kpi__label">Total ejecutado</div>
+            <div class="kpi__value kpi__value--accent">{{ copCorto(granTotalEjecutado) }}</div>
+            <div class="kpi__foot">{{ pct(granTotalEjecutado, granTotalPresupuesto) }}% del presupuesto</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi__label">Presupuesto asignado</div>
+            <div class="kpi__value">{{ copCorto(granTotalPresupuesto) }}</div>
+            <div class="kpi__foot">{{ filas.length }} equipo{{ filas.length !== 1 ? 's' : '' }} · vista {{ rolScope }}</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi__label">Saldo disponible</div>
+            <div class="kpi__value">{{ copCorto(granTotalPresupuesto - granTotalEjecutado) }}</div>
+            <div class="kpi__foot">presupuesto − ejecutado</div>
+          </div>
+          <div class="kpi" [class.kpi--riesgo]="equiposEnRiesgo > 0">
+            <div class="kpi__label">Equipos &gt; 90 %</div>
+            <div class="kpi__value" [class.kpi__value--riesgo]="equiposEnRiesgo > 0">{{ equiposEnRiesgo }}</div>
+            <div class="kpi__foot">de algún bucket presupuestal</div>
+          </div>
+        </div>
+
+        @if (consolidado.length === 0) {
+          <div class="empty-state empty-state--card">Ningún equipo tiene presupuesto configurado en esta temporada</div>
+        } @else if (filas.length === 0) {
+          <div class="empty-state empty-state--card">Sin resultados para «{{ search }}»</div>
+        } @else {
+          <div class="table-card">
+            <div class="table-scroll">
+              <table class="matriz">
+                <thead>
+                  <!-- Fila 1: cabeceras de familia -->
+                  <tr class="matriz__fam-row">
+                    <th class="col-equipo col-equipo--head" rowspan="2">Equipo</th>
+                    @for (g of gruposFamilia; track g.familia) {
+                      <th class="fam-head" [class]="'fam-head--' + g.familia" [attr.colspan]="g.categorias.length">
+                        {{ FAMILIA_LABEL[g.familia].icon }} {{ FAMILIA_LABEL[g.familia].label }}
+                      </th>
+                    }
+                    @for (b of bucketsVisibles; track b.id) {
+                      <th class="sub-head" rowspan="2">{{ b.icon }} Subtotal {{ b.id }}</th>
+                    }
+                    <th class="total-head" rowspan="2">TOTAL</th>
+                  </tr>
+                  <!-- Fila 2: códigos de categoría -->
+                  <tr class="matriz__cat-row">
+                    @for (c of categoriasVisibles; track c.codigo) {
+                      <th class="cat-head" [title]="c.nombreLargo">{{ c.codigo }}</th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (f of filas; track f.equipo.equipoId) {
+                    <tr class="matriz-row" (click)="abrirDrill(f)" role="button" tabindex="0" (keydown.enter)="abrirDrill(f)">
+                      <td class="col-equipo">
+                        <div class="equipo-cell" [style.padding-left.px]="f.indentPx">
+                          <span class="tipo-chip" [class]="'tipo-chip--' + f.equipo.equipoTipo.toLowerCase()">{{ f.equipo.equipoTipo }}</span>
+                          <span class="equipo-nombre">{{ f.equipo.equipoNombre }}</span>
+                        </div>
+                      </td>
+                      @for (c of categoriasVisibles; track c.codigo) {
+                        <td class="celda">
+                          @if (f.ejecutado.porCat[c.codigo]) {
+                            {{ copCorto(f.ejecutado.porCat[c.codigo]) }}
+                          } @else {
+                            <span class="celda-cero">·</span>
+                          }
+                        </td>
+                      }
+                      @for (b of f.buckets; track b.bucket.id) {
+                        <td class="celda celda--sub">
+                          <div class="sub-cell">
+                            <span>@if (b.ejecutado) { {{ copCorto(b.ejecutado) }} } @else { <span class="celda-cero">·</span> }</span>
+                            <span class="pct-badge pct-badge--sm" [class]="semaforo(b.pct)">{{ b.pct }}%</span>
+                          </div>
+                        </td>
+                      }
+                      <td class="celda celda--total">@if (f.total) { {{ copCorto(f.total) }} } @else { <span class="celda-cero">·</span> }</td>
+                    </tr>
+                  }
+                  <tr class="matriz-row matriz-row--total">
+                    <td class="col-equipo col-equipo--total">TOTAL POR CATEGORÍA</td>
+                    @for (c of categoriasVisibles; track c.codigo) {
+                      <td class="celda">
+                        @if (totalesCat[c.codigo]) {
+                          {{ copCorto(totalesCat[c.codigo]) }}
+                        } @else {
+                          <span class="celda-cero">·</span>
+                        }
+                      </td>
+                    }
+                    @for (b of totalesBucket; track b.bucket.id) {
+                      <td class="celda celda--sub">
+                        <div class="sub-cell">
+                          <span>@if (b.ejecutado) { {{ copCorto(b.ejecutado) }} } @else { <span class="celda-cero">·</span> }</span>
+                          <span class="pct-badge pct-badge--sm" [class]="semaforo(b.pct)">{{ b.pct }}%</span>
+                        </div>
+                      </td>
+                    }
+                    <td class="celda celda--total">{{ copCorto(granTotalEjecutado) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="tabla-nota">Clic en un equipo para ver el detalle por rubro · montos abreviados, el CSV lleva las cifras completas</div>
+        }
+      }
+    </div>
+  </main>
+</div>

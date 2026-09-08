@@ -62,6 +62,7 @@ export class Navtab {
     { icon: '📊', label: 'Presupuestos',         route: '/presupuestos/crear',     roles: ['ENL_RECURSOS'] },
     { icon: '📝', label: 'Reporte de gastos',    route: '/reportes/mensual',       area: 'RECURSOS' },
     { icon: '✅', label: 'Gestión de reportes',  route: '/reportes/gestion',       area: 'RECURSOS' },
+    { icon: '🔬', label: 'Análisis de gastos',   route: '/reportes/analisis',      area: 'RECURSOS' },
 
     // Módulo Logístico: solo visible para roles _LOGISTICA, sin importar el
     // nivel jerárquico (ENL, ERLE o ERL).
