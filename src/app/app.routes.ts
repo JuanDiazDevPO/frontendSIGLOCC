@@ -113,6 +113,13 @@ export const routes: Routes = [
         .then(m => m.GestionReportesComponent)
   },
   {
+    path: 'reportes/analisis',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./analisis-gastos/analisis-gastos.component')
+        .then(m => m.AnalisisGastosComponent)
+  },
+  {
     path: '',
     redirectTo: 'login',
     pathMatch: 'full'
