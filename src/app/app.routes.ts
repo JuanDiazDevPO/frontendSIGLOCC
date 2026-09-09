@@ -50,6 +50,13 @@ export const routes: Routes = [
         .then(m => m.GestionAnticiposComponent)
   },
   {
+    path: 'temporadas',
+    canActivate: [authGuard, roleGuard('ENL_RECURSOS', 'ENL_LOGISTICA', 'ADMIN')],
+    loadComponent: () =>
+      import('./temporadas/temporadas.component')
+        .then(m => m.TemporadasComponent)
+  },
+  {
     path: 'temporadas/parametros',
     canActivate: [authGuard, roleGuard('ENL_RECURSOS', 'ENL_LOGISTICA', 'ADMIN')],
     loadComponent: () =>
