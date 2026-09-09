@@ -336,6 +336,19 @@ export class EntregasComponent implements OnInit {
     if (input.value !== filtered) input.value = filtered;
   }
 
+  /**
+   * Chrome solo abre el calendario nativo al hacer clic en el iconito del borde; en el resto
+   * del campo solo selecciona un segmento, y se siente como que no funciona.
+   */
+  abrirCalendario(event: Event): void {
+    const input = event.target as HTMLInputElement & { showPicker?: () => void };
+    try {
+      input.showPicker?.();
+    } catch {
+      // Navegador sin soporte o sin gesto de usuario: queda el comportamiento nativo.
+    }
+  }
+
   errCrear(key: keyof CrearActaForm): string | undefined {
     return this.submittedCrear ? this.errorsCrear[key] : undefined;
   }

@@ -1,0 +1,352 @@
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <div>
+          <div class="topbar-heading">Temporadas</div>
+          <div class="topbar-sub">Ciclo OCC · preparación y comparativo histórico</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn-outline btn-nowrap" (click)="abrirClonar()" type="button" [disabled]="temporadasConParametros.length === 0">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Clonar parámetros
+        </button>
+        <button class="btn-primary btn-nowrap" (click)="abrirNueva()" type="button">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nueva temporada
+        </button>
+      </div>
+    </header>
+
+    <div class="content">
+      @if (cargando) {
+        <div class="state-center"><span class="spinner"></span><span>Cargando temporadas…</span></div>
+      } @else if (errorCarga) {
+        <div class="state-center">
+          <div class="state-icon">⚠️</div>
+          <div class="state-title">{{ errorCarga }}</div>
+          <button class="btn-primary" (click)="reintentar()" type="button">Reintentar</button>
+        </div>
+      } @else if (temporadas.length === 0) {
+        <div class="state-center">
+          <div class="state-icon">📅</div>
+          <div class="state-title">Aún no hay temporadas registradas</div>
+          <button class="btn-primary" (click)="abrirNueva()" type="button">Crear la primera temporada</button>
+        </div>
+      } @else {
+
+        <!-- 1 · Temporada vigente -->
+        @if (vigente; as v) {
+          <div class="hero">
+            <div class="hero__top">
+              <div class="hero__id">
+                <div class="hero__title-row">
+                  <span class="hero__nombre">{{ v.nombre }}</span>
+                  @if (v.esActual) {
+                    <span class="badge-vigente"><span class="badge-dot"></span>VIGENTE</span>
+                  }
+                </div>
+                <div class="hero__fechas">{{ fmtLargo(v.fechaInicio) }} — {{ fmtLargo(v.fechaFin) }}</div>
+              </div>
+
+              @if (ag(v.id); as a) {
+                <div class="hero__stats">
+                  <div class="hero-stat">
+                    <div class="hero-stat__label">Días restantes</div>
+                    <div class="hero-stat__value" [class]="claseRestantes(progreso.restantes)">{{ n(progreso.restantes) }}</div>
+                  </div>
+                  <div class="hero-stat">
+                    <div class="hero-stat__label">Transcurridos</div>
+                    <div class="hero-stat__value">{{ n(progreso.transcurridos) }} / {{ n(progreso.total) }}</div>
+                  </div>
+                  <div class="hero-stat">
+                    <div class="hero-stat__label">Cajas entregadas</div>
+                    <div class="hero-stat__value" [class]="claseEntrega(pct(a.cajasEntregadas, a.cajasRecibidas))">
+                      {{ pct(a.cajasEntregadas, a.cajasRecibidas) }}%
+                    </div>
+                  </div>
+                  <div class="hero-stat">
+                    <div class="hero-stat__label">Reportes aprobados</div>
+                    <div class="hero-stat__value">{{ a.reportesAprobados }} / {{ a.reportesTotal }}</div>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Línea de tiempo con marcador de hoy -->
+            <div class="hero__timeline">
+              <div class="timeline">
+                <div class="timeline__fill" [style.width.%]="progreso.pct"></div>
+                <div class="timeline__hoy" [style.left.%]="progreso.pct"></div>
+              </div>
+              <div class="timeline__labels">
+                <span>{{ fmtFecha(v.fechaInicio) }}</span>
+                <span class="timeline__hoy-label">hoy · {{ progreso.pct }}%</span>
+                <span>{{ fmtFecha(v.fechaFin) }}</span>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- 2 · Checklist de preparación -->
+        <div class="card">
+          <div class="card__head">
+            <span class="card__title">Preparación de la temporada</span>
+            <label class="sr-only" for="selTemporada">Temporada a revisar</label>
+            <select id="selTemporada" class="form-input form-select form-select--sm"
+              [ngModel]="seleccionadaId" (ngModelChange)="seleccionar($event)" name="selTemporada">
+              @for (t of temporadas; track t.id) {
+                <option [value]="t.id">{{ t.nombre }}</option>
+              }
+            </select>
+            <span class="chip-listos" [class.chip-listos--ok]="checklistListos === checklist.length">
+              {{ checklistListos }} / {{ checklist.length }} listos
+            </span>
+          </div>
+          <div class="checklist">
+            @for (c of checklist; track c.label) {
+              <div class="check-item" [class.check-item--link]="c.ruta"
+                [attr.role]="c.ruta ? 'link' : null" [attr.tabindex]="c.ruta ? 0 : null"
+                (click)="c.ruta && irA(c.ruta)" (keydown.enter)="c.ruta && irA(c.ruta)">
+                <div class="check-icon" [class.check-icon--ok]="c.ok">
+                  @if (c.ok) {
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  } @else {
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  }
+                </div>
+                <div class="check-text">
+                  <div class="check-label">{{ c.icon }} {{ c.label }}</div>
+                  <div class="check-nota" [class.check-nota--pendiente]="!c.ok">{{ c.nota }}</div>
+                </div>
+                @if (c.ruta) {
+                  <span class="check-arrow">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </span>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- 3 · Comparativo histórico -->
+        <div class="card">
+          <div class="card__head">
+            <span class="card__title">Comparativo histórico</span>
+            <span class="card__sub">· {{ temporadas.length }} temporada{{ temporadas.length !== 1 ? 's' : '' }}</span>
+          </div>
+          <div class="table-scroll">
+            <table class="tabla">
+              <thead>
+                <tr>
+                  <th>Temporada</th>
+                  <th>Período</th>
+                  <th>Estado</th>
+                  <th class="col-right">Presupuesto</th>
+                  <th class="col-right">Iglesias</th>
+                  <th class="col-right">Cajas recib.</th>
+                  <th class="col-right">Cajas entreg.</th>
+                  <th>% entrega</th>
+                  <th class="col-right">Reportes</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of temporadas; track t.id) {
+                  <tr class="fila" [class.fila--sel]="t.id === seleccionadaId"
+                    (click)="seleccionar(t.id)" role="button" tabindex="0" (keydown.enter)="seleccionar(t.id)">
+                    <td>
+                      <div class="celda-nombre">
+                        <span class="nombre">{{ t.nombre }}</span>
+                        @if (t.esActual) { <span class="dot-vigente" title="Vigente"></span> }
+                      </div>
+                    </td>
+                    <td class="cell-muted nowrap">{{ fmtFecha(t.fechaInicio) }} — {{ fmtFecha(t.fechaFin) }}</td>
+                    <td>
+                      <span class="fase" [class]="fase(t).cssClass"><span class="fase-dot"></span>{{ fase(t).label }}</span>
+                    </td>
+                    @if (ag(t.id); as a) {
+                      <td class="col-right col-fuerte">{{ copCorto(a.presupuestoTotal) }}</td>
+                      <td class="col-right cell-num">{{ n(a.iglesiasAprobadas) }}<span class="sub">/{{ n(a.iglesias) }}</span></td>
+                      <td class="col-right cell-num">{{ n(a.cajasRecibidas) }}</td>
+                      <td class="col-right cell-num cell-entregadas">{{ n(a.cajasEntregadas) }}</td>
+                      <td class="col-entrega">
+                        <div class="barra-wrap">
+                          <div class="barra"><div class="barra__fill" [class]="claseEntrega(pct(a.cajasEntregadas, a.cajasRecibidas))" [style.width.%]="pct(a.cajasEntregadas, a.cajasRecibidas)"></div></div>
+                          <span class="barra__pct" [class]="claseEntrega(pct(a.cajasEntregadas, a.cajasRecibidas))">{{ pct(a.cajasEntregadas, a.cajasRecibidas) }}%</span>
+                        </div>
+                      </td>
+                      <td class="col-right cell-num">{{ a.reportesAprobados }}<span class="sub">/{{ a.reportesTotal }}</span></td>
+                    } @else {
+                      <td class="col-right cell-muted" colspan="6">—</td>
+                    }
+                    <td class="col-accion">
+                      @if (!t.esActual) {
+                        <button class="btn-mini" (click)="pedirActivar(t, $event)" type="button" title="Marcar como temporada vigente">Activar</button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pie-nota">
+          Métricas derivadas de los endpoints de cada módulo filtrados por <code>temporadaId</code>.
+        </div>
+      }
+    </div>
+  </main>
+
+  <!-- ══════════ MODAL: CLONAR PARÁMETROS ══════════ -->
+  @if (clonarOpen) {
+    <div class="modal-overlay" role="button" tabindex="0" aria-label="Cerrar diálogo"
+      (click)="$event.target === $event.currentTarget && cerrarClonar()"
+      (keydown.enter)="$event.target === $event.currentTarget && cerrarClonar()"
+      (keydown.escape)="cerrarClonar()">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="clonarTitle">
+        <div class="modal-head">
+          <div class="modal-icon modal-icon--accent">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </div>
+          <div>
+            <div class="modal-title" id="clonarTitle">Clonar parámetros</div>
+            <div class="modal-desc">Copia la configuración completa de costos y estándares de una temporada a otra.</div>
+          </div>
+        </div>
+
+        <div class="modal-body">
+          <div class="field">
+            <label class="field-label" for="clonarOrigen">Temporada origen <span class="req">*</span></label>
+            <select id="clonarOrigen" class="form-input form-select" [(ngModel)]="clonarOrigen" name="clonarOrigen">
+              <option value="">Seleccionar origen</option>
+              @for (t of temporadasConParametros; track t.id) { <option [value]="t.id">{{ t.nombre }}</option> }
+            </select>
+            <span class="field-hint">Solo temporadas con parámetros configurados.</span>
+          </div>
+
+          <div class="flecha-abajo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="clonarDestino">Temporada destino <span class="req">*</span></label>
+            <select id="clonarDestino" class="form-input form-select" [(ngModel)]="clonarDestino" name="clonarDestino">
+              <option value="">Seleccionar destino</option>
+              @for (t of clonarDestinos; track t.id) { <option [value]="t.id">{{ t.nombre }}</option> }
+            </select>
+          </div>
+
+          @if (clonarOrigenTemporada; as o) {
+            <div class="info-note">
+              Se copiarán los parámetros de <strong>{{ o.nombre }}</strong>@if (ag(o.id)?.trm) {, incluyendo la TRM de <strong>{{ cop(ag(o.id)!.trm!) }}</strong>}.
+              Podrás ajustarlos después en Parámetros.
+            </div>
+          }
+          @if (clonarDestino && ag(+clonarDestino)?.parametros) {
+            <div class="warn-note">
+              ⚠ La temporada destino ya tiene parámetros configurados: se sobrescribirán.
+            </div>
+          }
+        </div>
+
+        <div class="modal-foot">
+          <button class="btn-cancel" (click)="cerrarClonar()" type="button" [disabled]="clonando">Cancelar</button>
+          <button class="btn-confirm" (click)="confirmarClonar()" type="button" [disabled]="!clonarValido || clonando">
+            @if (clonando) { <span class="spinner-sm"></span> Clonando… } @else { Clonar }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ══════════ MODAL: NUEVA TEMPORADA ══════════ -->
+  @if (nuevaOpen) {
+    <div class="modal-overlay" role="button" tabindex="0" aria-label="Cerrar diálogo"
+      (click)="$event.target === $event.currentTarget && cerrarNueva()"
+      (keydown.enter)="$event.target === $event.currentTarget && cerrarNueva()"
+      (keydown.escape)="cerrarNueva()">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="nuevaTitle">
+        <div class="modal-head">
+          <div class="modal-icon modal-icon--azul">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <div>
+            <div class="modal-title" id="nuevaTitle">Nueva temporada</div>
+            <div class="modal-desc">Define el nombre y el rango de fechas del nuevo ciclo.</div>
+          </div>
+        </div>
+
+        <div class="modal-body">
+          <div class="field">
+            <label class="field-label" for="nuevaNombre">Nombre de la temporada <span class="req">*</span></label>
+            <input id="nuevaNombre" class="form-input" [class.form-input--error]="errNueva('nombre')"
+              [(ngModel)]="nueva.nombre" name="nuevaNombre" type="text" placeholder="Ej: OCC 2027" />
+            @if (errNueva('nombre')) { <span class="field-error">⚠ {{ errNueva('nombre') }}</span> }
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label" for="nuevaIni">Fecha de inicio <span class="req">*</span></label>
+              <input id="nuevaIni" class="form-input" [class.form-input--error]="errNueva('fechaInicio')"
+                [(ngModel)]="nueva.fechaInicio" name="nuevaIni" type="date" (click)="abrirCalendario($event)" />
+              @if (errNueva('fechaInicio')) { <span class="field-error">⚠ {{ errNueva('fechaInicio') }}</span> }
+            </div>
+            <div class="field">
+              <label class="field-label" for="nuevaFin">Fecha de cierre <span class="req">*</span></label>
+              <input id="nuevaFin" class="form-input" [class.form-input--error]="errNueva('fechaFin')"
+                [(ngModel)]="nueva.fechaFin" name="nuevaFin" type="date" (click)="abrirCalendario($event)" />
+              @if (errNueva('fechaFin')) { <span class="field-error">⚠ {{ errNueva('fechaFin') }}</span> }
+            </div>
+          </div>
+          <div class="info-note">
+            La temporada se crea sin parámetros. Después puedes clonarlos desde otra temporada
+            o configurarlos en Parámetros. Para que pase a ser la vigente, usa <strong>Activar</strong> en el comparativo.
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <button class="btn-cancel" (click)="cerrarNueva()" type="button" [disabled]="creando">Cancelar</button>
+          <button class="btn-confirm" (click)="crearTemporada()" type="button" [disabled]="creando">
+            @if (creando) { <span class="spinner-sm"></span> Creando… } @else { Crear temporada }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ══════════ MODAL: ACTIVAR TEMPORADA ══════════ -->
+  @if (activarTarget) {
+    <div class="modal-overlay" role="button" tabindex="0" aria-label="Cerrar diálogo"
+      (click)="$event.target === $event.currentTarget && cerrarActivar()"
+      (keydown.enter)="$event.target === $event.currentTarget && cerrarActivar()"
+      (keydown.escape)="cerrarActivar()">
+      <div class="modal modal--sm" role="dialog" aria-modal="true" aria-labelledby="activarTitle">
+        <div class="modal-head">
+          <div class="modal-icon modal-icon--alerta">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div>
+            <div class="modal-title" id="activarTitle">¿Activar {{ activarTarget.nombre }}?</div>
+            <div class="modal-desc">
+              Pasará a ser la temporada vigente y toda la app (dashboard, reportes, logística)
+              usará sus datos por defecto. La temporada actual dejará de serlo.
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn-cancel" (click)="cerrarActivar()" type="button" [disabled]="activando">Cancelar</button>
+          <button class="btn-confirm" (click)="confirmarActivar()" type="button" [disabled]="activando">
+            @if (activando) { <span class="spinner-sm"></span> Activando… } @else { Sí, activar }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

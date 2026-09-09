@@ -51,7 +51,7 @@ export class Navtab {
     // Módulo Core: filas 1-3 de la matriz — solo ENL (cualquier sufijo) o ADMIN.
     { section: 'Administración', roles: CORE_ROLES },
     { icon: '👥', label: 'Usuarios',   route: '/usuarios',              roles: CORE_ROLES },
-    { icon: '⊞', label: 'Temporadas', route: null,                     roles: CORE_ROLES },
+    { icon: '📅', label: 'Temporadas', route: '/temporadas',           roles: CORE_ROLES },
     { icon: '⚙', label: 'Parámetros', route: '/temporadas/parametros', roles: CORE_ROLES },
 
     // Módulo Financiero: solo visible para roles _RECURSOS, sin importar el

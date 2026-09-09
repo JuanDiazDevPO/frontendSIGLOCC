@@ -178,7 +178,7 @@
         <div class="field">
           <label class="field-label" for="fechaEntrega">Fecha de entrega <span class="required">*</span></label>
           <input id="fechaEntrega" class="form-input" [class.form-input--error]="errCrear('fechaEntrega')"
-            [(ngModel)]="formCrear.fechaEntrega" name="fechaEntrega" type="date" />
+            [(ngModel)]="formCrear.fechaEntrega" name="fechaEntrega" type="date" (click)="abrirCalendario($event)" />
           @if (errCrear('fechaEntrega')) { <span class="field-error">⚠ {{ errCrear('fechaEntrega') }}</span> }
         </div>
       </div>

@@ -38,7 +38,42 @@ export class SessionService {
     localStorage.removeItem(this.USER_KEY);
   }
 
+  /**
+   * Fecha de expiración del JWT (claim `exp`, en segundos), o null si el token
+   * no existe o no se puede leer.
+   */
+  getExpiracion(): Date | null {
+    const token = this.getToken();
+    if (!token) return null;
+    try {
+      const payload = token.split('.')[1];
+      if (!payload) return null;
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const json = atob(base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '='));
+      const exp = JSON.parse(json)?.exp;
+      return typeof exp === 'number' ? new Date(exp * 1000) : null;
+    } catch {
+      return null; // token malformado: se trata como inválido
+    }
+  }
+
+  /** Un token vencido en localStorage no es sesión válida, aunque siga presente. */
+  isTokenExpirado(): boolean {
+    const exp = this.getExpiracion();
+    return exp !== null && exp.getTime() <= Date.now();
+  }
+
+  /**
+   * Antes solo comprobaba que el token existiera, así que con uno vencido el guard
+   * dejaba entrar y todas las peticiones fallaban en silencio. Ahora también valida
+   * la expiración y limpia la sesión muerta.
+   */
   isLogged(): boolean {
-    return !!this.getToken();
+    if (!this.getToken()) return false;
+    if (this.isTokenExpirado()) {
+      this.clear();
+      return false;
+    }
+    return true;
   }
 }
