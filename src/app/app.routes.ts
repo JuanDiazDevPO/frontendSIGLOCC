@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard, roleGuard } from './auth.guard';
+import { authGuard, guestGuard, roleGuard, areaGuard } from './auth.guard';
 
 export const routes: Routes = [
   {
@@ -30,7 +30,7 @@ export const routes: Routes = [
   },
   {
     path: 'anticipos/crear',
-    canActivate: [authGuard],
+    canActivate: [authGuard, areaGuard('RECURSOS')],
     loadComponent: () =>
       import('./crear-anticipo/crear-anticipo.component')
         .then(m => m.CrearAnticipoComponent)
@@ -65,35 +65,35 @@ export const routes: Routes = [
   },
   {
     path: 'iglesias',
-    canActivate: [authGuard],
+    canActivate: [authGuard, areaGuard('LOGISTICA')],
     loadComponent: () =>
       import('./gestion-iglesias/gestion-iglesias.component')
         .then(m => m.GestionIglesiasComponent)
   },
   {
     path: 'asignaciones',
-    canActivate: [authGuard],
+    canActivate: [authGuard, areaGuard('LOGISTICA')],
     loadComponent: () =>
       import('./asignaciones/asignaciones.component')
         .then(m => m.AsignacionesComponent)
   },
   {
     path: 'entregas',
-    canActivate: [authGuard],
+    canActivate: [authGuard, areaGuard('LOGISTICA')],
     loadComponent: () =>
       import('./entregas/entregas.component')
         .then(m => m.EntregasComponent)
   },
   {
     path: 'puntos-entrega',
-    canActivate: [authGuard],
+    canActivate: [authGuard, areaGuard('LOGISTICA')],
     loadComponent: () =>
       import('./puntos-entrega/puntos-entrega.component')
         .then(m => m.PuntosEntregaComponent)
   },
   {
     path: 'capacitaciones',
-    canActivate: [authGuard],
+    canActivate: [authGuard, areaGuard('LOGISTICA')],
     loadComponent: () =>
       import('./capacitaciones/capacitaciones.component')
         .then(m => m.CapacitacionesComponent)
@@ -107,21 +107,21 @@ export const routes: Routes = [
   },
   {
     path: 'reportes/mensual',
-    canActivate: [authGuard],
+    canActivate: [authGuard, areaGuard('RECURSOS')],
     loadComponent: () =>
       import('./reporte-mensual/reporte-mensual.component')
         .then(m => m.ReporteMensualComponent)
   },
   {
     path: 'reportes/gestion',
-    canActivate: [authGuard],
+    canActivate: [authGuard, areaGuard('RECURSOS')],
     loadComponent: () =>
       import('./gestion-reportes/gestion-reportes.component')
         .then(m => m.GestionReportesComponent)
   },
   {
     path: 'reportes/analisis',
-    canActivate: [authGuard],
+    canActivate: [authGuard, areaGuard('RECURSOS')],
     loadComponent: () =>
       import('./analisis-gastos/analisis-gastos.component')
         .then(m => m.AnalisisGastosComponent)
