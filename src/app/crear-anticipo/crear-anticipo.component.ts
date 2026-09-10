@@ -43,6 +43,20 @@ export interface AnticipResult {
   rutaPdf: string | null;
 }
 
+interface RubroSaldo {
+  presupuesto: number;
+  ejecutado: number;
+  disponible: number;
+}
+
+interface SaldosEquipo {
+  equipoId: number;
+  equipoNombre: string;
+  temporadaId: number;
+  entrenamiento: RubroSaldo;
+  mentoreo: RubroSaldo;
+}
+
 const EMPTY_FORM: AnticipForm = {
   titulo: '', descripcion: '', montoSolicitado: '', tipoPresupuesto: '',
   ciudad: '', cedula: '', banco: '', tipoCuenta: '',
@@ -68,10 +82,11 @@ export class CrearAnticipoComponent {
   result: AnticipResult | null = null;
   errors: Record<string, string> = {};
 
-  readonly SALDO_DISPONIBLE: Record<string, number> = {
-    ENTRENAMIENTO: 3_900_000,
-    MENTOREO: 6_300_000,
-  };
+  // Real: GET /v1/anticipos/mis-saldos. Antes venían quemados (3.900.000 / 6.300.000)
+  // y no reflejaban ni el equipo ni la temporada activa del usuario.
+  saldos: Record<'ENTRENAMIENTO' | 'MENTOREO', number> | null = null;
+  saldosLoading = false;
+  saldosError: string | null = null;
 
   readonly BANCOS = [
     'BANCOLOMBIA', 'BANCO DE BOGOTÁ', 'DAVIVIENDA', 'BBVA', 'COLPATRIA',
@@ -94,12 +109,42 @@ export class CrearAnticipoComponent {
   // eslint-disable-next-line @angular-eslint/prefer-inject
   constructor(private session: SessionService, private http: HttpClient) {
     this.user = this.session.getUser();
+    this.cargarSaldos();
+  }
+
+  private cargarSaldos(): void {
+    this.saldosLoading = true;
+    this.saldosError = null;
+    this.http
+      .get<SaldosEquipo>(`${environment.apiUrl}/v1/anticipos/mis-saldos`)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: data => {
+          this.saldos = {
+            ENTRENAMIENTO: data.entrenamiento.disponible,
+            MENTOREO: data.mentoreo.disponible,
+          };
+          this.saldosLoading = false;
+          this.cdr.detectChanges();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.saldos = null;
+          this.saldosLoading = false;
+          this.saldosError = err.status === 404
+            ? 'No hay presupuesto configurado para tu equipo en la temporada activa.'
+            : err.status === 409
+              ? 'No hay una temporada activa.'
+              : 'No se pudieron cargar los saldos.';
+          this.cdr.detectChanges();
+        },
+      });
   }
 
   get montoNum(): number { return Number(this.form.montoSolicitado) || 0; }
 
   get saldoDisponible(): number | null {
-    return this.form.tipoPresupuesto ? (this.SALDO_DISPONIBLE[this.form.tipoPresupuesto] ?? null) : null;
+    if (!this.form.tipoPresupuesto || !this.saldos) return null;
+    return this.saldos[this.form.tipoPresupuesto as 'ENTRENAMIENTO' | 'MENTOREO'] ?? null;
   }
 
   get excede(): boolean {

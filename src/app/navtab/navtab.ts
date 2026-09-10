@@ -73,7 +73,6 @@ export class Navtab {
     { icon: '📥', label: 'Recepciones',    route: null,               area: 'LOGISTICA' }, // filas 13/16/18, aún sin pantalla
     { icon: '📦', label: 'Asignaciones',   route: '/asignaciones',   area: 'LOGISTICA' },
     { icon: '🎓', label: 'Capacitaciones', route: '/capacitaciones', area: 'LOGISTICA' },
-    { icon: '🚚', label: 'Entregas',       route: '/entregas',       area: 'LOGISTICA' },
   ];
 
   get navItems(): NavItem[] {

@@ -10,20 +10,6 @@ const RUTAS_PUBLICAS = ['/auth/login', '/auth/recuperar-password', '/auth/restab
 /** Evita que N peticiones fallidas a la vez disparen N redirecciones y N toasts. */
 let cerrandoSesion = false;
 
-/**
- * Este backend responde la sesión inválida de tres formas: 401, y también 400/409 con
- * un mensaje de sesión en el cuerpo (mismo IllegalStateException mapeado distinto según
- * el controlador). Las tres significan lo mismo para el usuario.
- */
-function esSesionInvalida(err: HttpErrorResponse): boolean {
-  if (err.status === 401) return true;
-  if (err.status === 400 || err.status === 409) {
-    const texto: string = err.error?.error ?? err.error?.mensaje ?? err.error?.message ?? '';
-    return /sesión|sesion|iniciar sesión|token/i.test(texto);
-  }
-  return false;
-}
-
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const session = inject(SessionService);
   const router = inject(Router);
@@ -43,9 +29,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(peticion).pipe(
     catchError((err: HttpErrorResponse) => {
-      // El token puede vencer o revocarse mientras el usuario está en una pantalla:
-      // sin esto, se queda navegando con todo fallando en silencio.
-      if (!esPublica && esSesionInvalida(err)) {
+      // Este backend usa 401 como cajón de sastre: lo devuelve por falta de permisos del
+      // rol, por rutas no mapeadas y por métodos no soportados, siempre con el cuerpo
+      // vacío, así que un 401 NO prueba que la sesión murió. Cerrar sesión aquí echaba a
+      // los ERL/ERLE —que son los que más puertas cerradas encuentran— diciéndoles que su
+      // token había expirado, con el token todavía vivo. La expiración se decide solo con
+      // el claim `exp`; el resto de 401 se propaga como el error normal que es.
+      if (!esPublica && err.status === 401 && session.isTokenExpirado()) {
         cerrarSesion(session, router, alert);
       }
       return throwError(() => err);
@@ -58,5 +48,7 @@ function cerrarSesion(session: SessionService, router: Router, alert: AlertServi
   cerrandoSesion = true;
   session.clear();
   alert.error('Tu sesión expiró. Vuelve a iniciar sesión.');
-  router.navigate(['/login']).finally(() => { cerrandoSesion = false; });
+  router.navigate(['/login'])
+    .catch(() => undefined)
+    .finally(() => { cerrandoSesion = false; });
 }

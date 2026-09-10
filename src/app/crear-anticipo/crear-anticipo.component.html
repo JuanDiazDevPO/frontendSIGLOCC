@@ -136,26 +136,32 @@
               <!-- Rubro presupuestal -->
               <div class="field">
                 <div class="field-label">Rubro presupuestal <span class="required">*</span></div>
-                <div class="rubro-grid">
-                  <button
-                    type="button"
-                    class="rubro-card"
-                    [class.rubro-card--selected]="form.tipoPresupuesto === 'ENTRENAMIENTO'"
-                    (click)="selectRubro('ENTRENAMIENTO')"
-                    [attr.aria-pressed]="form.tipoPresupuesto === 'ENTRENAMIENTO'">
-                    <div class="rubro-name" [class.rubro-name--selected]="form.tipoPresupuesto === 'ENTRENAMIENTO'">📚 ENTRENAMIENTO</div>
-                    <div class="rubro-saldo">Saldo: <strong>{{ cop(SALDO_DISPONIBLE['ENTRENAMIENTO']) }}</strong></div>
-                  </button>
-                  <button
-                    type="button"
-                    class="rubro-card"
-                    [class.rubro-card--selected]="form.tipoPresupuesto === 'MENTOREO'"
-                    (click)="selectRubro('MENTOREO')"
-                    [attr.aria-pressed]="form.tipoPresupuesto === 'MENTOREO'">
-                    <div class="rubro-name" [class.rubro-name--selected]="form.tipoPresupuesto === 'MENTOREO'">🤝 MENTOREO</div>
-                    <div class="rubro-saldo">Saldo: <strong>{{ cop(SALDO_DISPONIBLE['MENTOREO']) }}</strong></div>
-                  </button>
-                </div>
+                @if (saldosLoading) {
+                  <div class="field-hint">Consultando saldos disponibles…</div>
+                } @else if (saldosError) {
+                  <div class="field-error">⚠ {{ saldosError }}</div>
+                } @else {
+                  <div class="rubro-grid">
+                    <button
+                      type="button"
+                      class="rubro-card"
+                      [class.rubro-card--selected]="form.tipoPresupuesto === 'ENTRENAMIENTO'"
+                      (click)="selectRubro('ENTRENAMIENTO')"
+                      [attr.aria-pressed]="form.tipoPresupuesto === 'ENTRENAMIENTO'">
+                      <div class="rubro-name" [class.rubro-name--selected]="form.tipoPresupuesto === 'ENTRENAMIENTO'">📚 ENTRENAMIENTO</div>
+                      <div class="rubro-saldo">Saldo: <strong>{{ cop(saldos?.ENTRENAMIENTO) }}</strong></div>
+                    </button>
+                    <button
+                      type="button"
+                      class="rubro-card"
+                      [class.rubro-card--selected]="form.tipoPresupuesto === 'MENTOREO'"
+                      (click)="selectRubro('MENTOREO')"
+                      [attr.aria-pressed]="form.tipoPresupuesto === 'MENTOREO'">
+                      <div class="rubro-name" [class.rubro-name--selected]="form.tipoPresupuesto === 'MENTOREO'">🤝 MENTOREO</div>
+                      <div class="rubro-saldo">Saldo: <strong>{{ cop(saldos?.MENTOREO) }}</strong></div>
+                    </button>
+                  </div>
+                }
                 @if (err('tipoPresupuesto')) {
                   <span class="field-error">⚠ {{ err('tipoPresupuesto') }}</span>
                 }
