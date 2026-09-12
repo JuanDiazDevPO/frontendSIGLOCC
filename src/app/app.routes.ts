@@ -64,6 +64,13 @@ export const routes: Routes = [
         .then(m => m.ParametrosTemporadaComponent)
   },
   {
+    path: 'logistica/dashboard',
+    canActivate: [authGuard, areaGuard('LOGISTICA')],
+    loadComponent: () =>
+      import('./dashboard-logistica/dashboard-logistica.component')
+        .then(m => m.DashboardLogisticaComponent)
+  },
+  {
     path: 'iglesias',
     canActivate: [authGuard, areaGuard('LOGISTICA')],
     loadComponent: () =>

@@ -1,0 +1,263 @@
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-title">
+        <div class="topbar-icon">🗺️</div>
+        <div>
+          <div class="topbar-heading">Dashboard Logística</div>
+          <div class="topbar-sub">{{ alcance }}</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        @if (!loadingTemporadas && temporadas.length > 0) {
+          <select class="temporada-select" aria-label="Temporada" [value]="temporadaId" (change)="onTemporadaChange($event)">
+            @for (t of temporadas; track t.id) {
+              <option [value]="t.id">{{ t.nombre }}</option>
+            }
+          </select>
+        }
+        <button class="refresh-btn" (click)="cargarDashboard()" type="button" title="Actualizar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <polyline points="23 4 23 10 17 10"/>
+            <polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+      @if (loadingTemporadas || loading) {
+        <div class="state-center">
+          <div class="spinner"></div>
+          <span>Cargando datos…</span>
+        </div>
+      } @else if (error || !data) {
+        <div class="state-center">
+          <div class="state-icon">⚠️</div>
+          <div class="state-title">{{ errorMsg || 'Error al cargar datos' }}</div>
+          <button class="retry-btn" (click)="cargarDashboard()" type="button">Reintentar</button>
+        </div>
+      } @else {
+
+        <!-- 1 · Franja de momentos -->
+        <div class="momentos-card">
+          <div class="momentos-strip">
+            @for (m of MOMENTOS; track m.n; let i = $index) {
+              <div class="momento-item">
+                <div class="momento-icon"
+                  [class.momento-done]="m.n < momentoActual"
+                  [class.momento-current]="m.n === momentoActual">
+                  {{ m.n < momentoActual ? '✓' : m.icon }}
+                </div>
+                <div>
+                  <div class="momento-label"
+                    [class.momento-label-active]="m.n === momentoActual"
+                    [class.momento-label-done]="m.n < momentoActual">{{ m.label }}</div>
+                  <div class="momento-estado">{{ m.n < momentoActual ? 'Completado' : m.n === momentoActual ? 'En curso' : 'Pendiente' }}</div>
+                </div>
+              </div>
+              @if (i < MOMENTOS.length - 1) {
+                <div class="momento-conector" [class.momento-conector-done]="m.n < momentoActual"></div>
+              }
+            }
+          </div>
+          <div class="avance-global">
+            <div>
+              <div class="avance-global-label">Avance de entrega</div>
+              <div class="avance-global-valor nivel-{{ nivel(avanceGlobal) }}">{{ avanceGlobal }}%</div>
+            </div>
+            <div class="avance-global-dona" [style.background]="avanceGlobalGradiente">
+              <div class="avance-global-dona-inner">🚚</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2 · Doble embudo -->
+        <div class="embudos-grid">
+          <div class="embudo-card">
+            <div class="embudo-header embudo-header-azul">
+              <span>⛪</span><span class="embudo-titulo">Embudo de iglesias</span><span class="embudo-unidad">iglesias</span>
+            </div>
+            <div class="embudo-body">
+              @for (p of pasosIglesias; track p.label; let i = $index) {
+                <div class="paso">
+                  <div class="paso-row">
+                    <span class="paso-label" [class.paso-label-first]="i === 0">{{ p.label }}</span>
+                    <div class="paso-valores">
+                      <span class="paso-valor">{{ N(p.valor) }}</span>
+                      @if (conversionPaso(pasosIglesias, i); as conv) {
+                        <span class="paso-conv nivel-{{ nivel(conv) }}">{{ conv }}%</span>
+                      }
+                    </div>
+                  </div>
+                  <div class="paso-track">
+                    <div class="paso-bar paso-bar-azul" [style.width.%]="anchoBarraPaso(pasosIglesias, i)"></div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="embudo-card">
+            <div class="embudo-header embudo-header-verde">
+              <span>📦</span><span class="embudo-titulo">Embudo de cajas</span><span class="embudo-unidad">cajas</span>
+            </div>
+            <div class="embudo-body">
+              @for (p of pasosCajas; track p.label; let i = $index) {
+                <div class="paso">
+                  <div class="paso-row">
+                    <span class="paso-label" [class.paso-label-first]="i === 0">{{ p.label }}</span>
+                    <div class="paso-valores">
+                      <span class="paso-valor">{{ N(p.valor) }}</span>
+                      @if (conversionPaso(pasosCajas, i); as conv) {
+                        <span class="paso-conv nivel-{{ nivel(conv) }}">{{ conv }}%</span>
+                      }
+                    </div>
+                  </div>
+                  <div class="paso-track">
+                    <div class="paso-bar paso-bar-verde" [style.width.%]="anchoBarraPaso(pasosCajas, i)"></div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- 3 · Requiere atención -->
+        @if (pendientes.length > 0) {
+          <div class="table-card">
+            <div class="table-header">
+              <span class="table-title">⚡ Requiere atención</span>
+              <span class="table-sub">
+                {{ pendientes.length }} pendiente{{ pendientes.length !== 1 ? 's' : '' }} · clic para resolver
+              </span>
+            </div>
+            <div class="pendientes-grid">
+              @for (p of pendientes; track p.label) {
+                <a class="pendiente-item" [routerLink]="p.ruta">
+                  <div class="pendiente-n tono-{{ p.tono }}">{{ N(p.n) }}</div>
+                  <div class="pendiente-texto">
+                    <div class="pendiente-label">{{ p.label }}</div>
+                    <div class="pendiente-nota">{{ p.nota }}</div>
+                  </div>
+                  <span class="pendiente-flecha">›</span>
+                </a>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- 4 · Inventario + 5 · Equipos -->
+        <div class="doble-grid">
+
+          <div class="table-card">
+            <div class="table-header">
+              <span class="table-title">📦 Inventario por categoría</span>
+            </div>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th class="col-cat">Categoría</th>
+                    <th class="col-num">Recib.</th>
+                    <th class="col-num">Asign.</th>
+                    <th class="col-num">Entreg.</th>
+                    <th class="col-num">Disp.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (c of inventario; track c.cat) {
+                    <tr class="data-row">
+                      <td class="col-cat"><span class="cat-icon">{{ c.icon }}</span>{{ c.cat }}</td>
+                      <td class="col-num">{{ N(c.recibidas) }}</td>
+                      <td class="col-num">{{ N(c.asignadas) }}</td>
+                      <td class="col-num accent">{{ N(c.entregadas) }}</td>
+                      <td class="col-num num-bold">{{ c.disponible === 0 ? '·' : N(c.disponible) }}</td>
+                    </tr>
+                  }
+                  <tr class="data-row-total">
+                    <td class="col-cat">TOTAL</td>
+                    <td class="col-num">{{ N(inventarioTotal.recibidas) }}</td>
+                    <td class="col-num">{{ N(inventarioTotal.asignadas) }}</td>
+                    <td class="col-num accent">{{ N(inventarioTotal.entregadas) }}</td>
+                    <td class="col-num num-bold">{{ N(inventarioTotal.disponible) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            @if (data.literatura.length > 0) {
+              <div class="literatura-wrap">
+                <div class="literatura-titulo">Literatura · recibida / entregada</div>
+                <div class="literatura-grid">
+                  @for (l of data.literatura; track l.tipoItemId) {
+                    <div class="literatura-item">
+                      <div class="literatura-row">
+                        <code class="literatura-codigo">{{ l.codigo }}</code>
+                        <span class="literatura-pct nivel-{{ nivel(literaturaPct(l)) }}">{{ literaturaPct(l) }}%</span>
+                      </div>
+                      <div class="literatura-valores">{{ N(l.entregada) }} / {{ N(l.recibida) }}</div>
+                      <div class="literatura-track">
+                        <div class="literatura-bar nivel-{{ nivel(literaturaPct(l)) }}" [style.width.%]="literaturaPct(l)"></div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="table-card">
+            <div class="table-header">
+              <span class="table-title">🏁 Avance por equipo</span>
+              <span class="table-sub">ordenado por % entregado</span>
+            </div>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th class="col-equipo">Equipo</th>
+                    <th class="col-num">Igl.</th>
+                    <th class="col-num">Capac.</th>
+                    <th class="col-num">Asign.</th>
+                    <th class="col-avance">Avance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (e of equiposOrdenados; track e.equipoId) {
+                    <tr class="data-row">
+                      <td class="col-equipo">
+                        <span class="tipo-chip {{ chipTipo(e.tipo) }}">{{ e.tipo }}</span>
+                        <span class="equipo-nombre">{{ e.nombre }}</span>
+                      </td>
+                      <td class="col-num">{{ e.iglesias }}</td>
+                      <td class="col-num" [class.warn]="e.capacitadas < e.iglesias">{{ e.capacitadas }}</td>
+                      <td class="col-num">{{ N(e.cajasAsignadas) }}</td>
+                      <td class="col-avance">
+                        <div class="avance-cell">
+                          <div class="progress-track">
+                            <div class="progress-bar nivel-{{ nivel(avanceEquipo(e)) }}" [style.width.%]="avanceEquipo(e)"></div>
+                          </div>
+                          <span class="avance-pct nivel-{{ nivel(avanceEquipo(e)) }}">{{ avanceEquipo(e) }}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="pie-nota">
+          Datos agregados de iglesias, capacitaciones, recepciones, asignaciones y entregas · filtrados por jerarquía del usuario
+        </div>
+      }
+    </div>
+  </main>
+</div>
