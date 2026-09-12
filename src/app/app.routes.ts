@@ -11,7 +11,7 @@ export const routes: Routes = [
   },
   {
     path: 'dashboard',
-    canActivate: [authGuard],
+    canActivate: [authGuard, areaGuard('RECURSOS')],
     loadComponent: () =>
       import('./dashboard/dashboard.component')
         .then(m => m.DashboardComponent)

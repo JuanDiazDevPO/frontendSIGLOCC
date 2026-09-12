@@ -12,7 +12,7 @@
       @if (item.section) {
         <div class="nav-section">{{ item.section }}</div>
       } @else if (item.route) {
-        <a [routerLink]="item.route" routerLinkActive="active" class="nav-item">
+        <a [routerLink]="item.route" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-item">
           <span class="nav-icon">{{ item.icon }}</span>
           {{ item.label }}
         </a>

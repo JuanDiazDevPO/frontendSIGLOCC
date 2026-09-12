@@ -46,8 +46,6 @@ export class Navtab {
   }
 
   private readonly allNavItems: NavItem[] = [
-    { icon: '◈', label: 'Dashboard', route: '/dashboard' },
-
     // Módulo Core: filas 1-3 de la matriz — solo ENL (cualquier sufijo) o ADMIN.
     { section: 'Administración', roles: CORE_ROLES },
     { icon: '👥', label: 'Usuarios',   route: '/usuarios',              roles: CORE_ROLES },
@@ -55,8 +53,12 @@ export class Navtab {
     { icon: '⚙', label: 'Parámetros', route: '/temporadas/parametros', roles: CORE_ROLES },
 
     // Módulo Financiero: solo visible para roles _RECURSOS, sin importar el
-    // nivel jerárquico (ENL, ERLE o ERL).
+    // nivel jerárquico (ENL, ERLE o ERL). El dashboard financiero vivía suelto arriba
+    // de todo, visible para cualquiera (incluida logística) sin exigir permiso alguno
+    // —aunque solo trae datos financieros—; ahora es una entrada más de este módulo,
+    // gateada igual que el resto (ver areaGuard('RECURSOS') en /dashboard).
     { section: 'Gestión Financiera', area: 'RECURSOS' },
+    { icon: '◈', label: 'Dashboard financiero', route: '/dashboard', area: 'RECURSOS' },
     { icon: '💰', label: 'Anticipos',            route: '/anticipos/crear',        area: 'RECURSOS' },
     { icon: '🏦', label: 'Gestión de anticipos', route: '/anticipos/gestion',      roles: ['ENL_RECURSOS'] },
     { icon: '📊', label: 'Presupuestos',         route: '/presupuestos/crear',     roles: ['ENL_RECURSOS'] },

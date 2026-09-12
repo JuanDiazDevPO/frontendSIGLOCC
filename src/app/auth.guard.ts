@@ -19,19 +19,6 @@ export const authGuard: CanActivateFn = () => {
   return router.createUrlTree(['/login']);
 };
 
-export function roleGuard(...roles: string[]): CanActivateFn {
-  return () => {
-    const session = inject(SessionService);
-    const router = inject(Router);
-    const alert = inject(AlertService);
-
-    if (roles.includes(session.getUser()?.rol ?? '')) return true;
-
-    alert.error(`Acceso restringido: solo ${roles.join(', ')} puede acceder a esta sección.`);
-    return router.createUrlTree(['/dashboard']);
-  };
-}
-
 // El sufijo del rol (_RECURSOS / _LOGISTICA) separa el módulo, sin importar el nivel
 // jerárquico (ENL/ERLE/ERL). Mismo criterio que usa navtab.ts para decidir qué se ve
 // en el menú — acá se aplica también en la ruta, que hasta ahora solo exigía sesión
@@ -44,17 +31,41 @@ function rolArea(rol: string): Area | '' {
   return '';
 }
 
+// El "home" ya no es un solo /dashboard para todos: el financiero es del área RECURSOS
+// y el logístico tiene el suyo propio. Un rol _LOGISTICA que cae aquí como fallback
+// (login, guestGuard, un guard que le niega el acceso) no puede aterrizar en un
+// /dashboard que además le está vedado — eso es exactamente el loop de redirección
+// infinita que ya se dio con /login↔/dashboard antes de esta corrección.
+export function homeRuta(rol: string): string {
+  return rolArea(rol) === 'LOGISTICA' ? '/logistica/dashboard' : '/dashboard';
+}
+
+export function roleGuard(...roles: string[]): CanActivateFn {
+  return () => {
+    const session = inject(SessionService);
+    const router = inject(Router);
+    const alert = inject(AlertService);
+    const rol = session.getUser()?.rol ?? '';
+
+    if (roles.includes(rol)) return true;
+
+    alert.error(`Acceso restringido: solo ${roles.join(', ')} puede acceder a esta sección.`);
+    return router.createUrlTree([homeRuta(rol)]);
+  };
+}
+
 export function areaGuard(area: Area): CanActivateFn {
   return () => {
     const session = inject(SessionService);
     const router = inject(Router);
     const alert = inject(AlertService);
+    const rol = session.getUser()?.rol ?? '';
 
-    if (rolArea(session.getUser()?.rol ?? '') === area) return true;
+    if (rolArea(rol) === area) return true;
 
     const modulo = area === 'RECURSOS' ? 'Gestión Financiera' : 'Gestión Logística';
     alert.error(`Acceso restringido: esta sección es de ${modulo}.`);
-    return router.createUrlTree(['/dashboard']);
+    return router.createUrlTree([homeRuta(rol)]);
   };
 }
 
@@ -67,5 +78,5 @@ export const guestGuard: CanActivateFn = () => {
     return true;
   }
 
-  return router.createUrlTree(['/dashboard']);
+  return router.createUrlTree([homeRuta(session.getUser()?.rol ?? '')]);
 };
