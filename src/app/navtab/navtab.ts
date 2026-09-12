@@ -71,7 +71,7 @@ export class Navtab {
     { icon: '⛪', label: 'Iglesias',     route: '/iglesias',       area: 'LOGISTICA' },
     { icon: '📍', label: 'Puntos de Entrega', route: '/puntos-entrega', area: 'LOGISTICA' },
     { icon: '🚚', label: 'Entregas',     route: '/entregas',       area: 'LOGISTICA' },
-    { icon: '📥', label: 'Recepciones',    route: null,               area: 'LOGISTICA' }, // filas 13/16/18, aún sin pantalla
+    { icon: '📥', label: 'Recepciones',    route: '/recepciones',     area: 'LOGISTICA' },
     { icon: '📦', label: 'Asignaciones',   route: '/asignaciones',   area: 'LOGISTICA' },
     { icon: '🎓', label: 'Capacitaciones', route: '/capacitaciones', area: 'LOGISTICA' },
   ];
