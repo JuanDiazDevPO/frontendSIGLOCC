@@ -1,0 +1,413 @@
+<div class="app-layout">
+  <app-navtab [user]="user" />
+
+  <main class="main">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        @if (vista === 'lista') {
+          <div class="topbar-heading">Recepción de Contenedores</div>
+          <div class="topbar-sub">
+            <label class="field-label-inline" for="temporadaHeaderSelect">Temporada</label>
+            <select id="temporadaHeaderSelect" class="form-input form-select form-select--sm"
+              [ngModel]="temporadaSeleccionada" (ngModelChange)="seleccionarTemporada($event)"
+              name="temporadaHeaderSelect" [disabled]="temporadasLoading">
+              <option value="">{{ temporadasLoading ? 'Cargando temporadas…' : 'Selecciona temporada' }}</option>
+              @for (t of temporadas; track t.id) {
+                <option [value]="t.id">{{ t.nombre }}{{ t.esActual ? ' (actual)' : '' }}</option>
+              }
+            </select>
+            @if (temporadasError) { <span class="field-error">⚠ {{ temporadasError }}</span> }
+          </div>
+        } @else {
+          <button class="btn-back" (click)="volverALista()" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div class="topbar-heading">
+            {{ vista === 'form' ? 'Registrar llegada de contenedor' : ('Contenedor ' + (seleccionada?.numeroContenedor ?? '')) }}
+          </div>
+        }
+      </div>
+      @if (vista === 'lista') {
+        <button class="btn-primary" (click)="irAForm()" type="button" [disabled]="!temporadaSeleccionada">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Registrar contenedor
+        </button>
+      }
+    </header>
+
+    <div class="content">
+
+      <!-- ══════════════ LISTA ══════════════ -->
+      @if (vista === 'lista') {
+
+        @if (recepcionesError) {
+          <div class="error-banner">⚠ {{ recepcionesError }}</div>
+        }
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value">{{ recepciones.length }}</div>
+            <div class="stat-label">Total contenedores</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value stat-value--accent">{{ totalCajasRecibidas.toLocaleString('es-CO') }}</div>
+            <div class="stat-label">Total cajas recibidas</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value stat-value--ok">{{ conDocumentacionCompleta }}</div>
+            <div class="stat-label">Con documentación completa</div>
+          </div>
+        </div>
+
+        <div class="table-card">
+          <div class="table-header">
+            <span class="table-title">
+              {{ recepcionesLoading ? 'Cargando…' : (recepciones.length + ' recepción' + (recepciones.length !== 1 ? 'es' : '') + ' registradas') }}
+            </span>
+            <span class="table-sub">Haz clic para ver detalle, documentos y fotos</span>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Contenedor</th>
+                  <th>Punto de entrega</th>
+                  <th>Fecha</th>
+                  <th class="col-right">Cajas</th>
+                  <th class="col-right">Literatura</th>
+                  <th>Docs</th>
+                  <th>Fotos</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of recepciones; track r.id) {
+                  <tr class="data-row" (click)="abrirDetalle(r)" role="button" tabindex="0" (keydown.enter)="abrirDetalle(r)">
+                    <td>
+                      <div class="cell-contenedor">{{ r.numeroContenedor }}</div>
+                      <div class="cell-sub">ID #{{ r.id }}</div>
+                    </td>
+                    <td>{{ ptNombre(r.puntoEntregaId) }}</td>
+                    <td class="cell-nowrap">{{ fmtFecha(r.fechaLlegada) }}</td>
+                    <td class="col-right cell-cajas">{{ r.totalCajasRecibidas.toLocaleString('es-CO') }}</td>
+                    <td class="col-right cell-lit">{{ literaturaTotal(r).toLocaleString('es-CO') }}</td>
+                    <td>
+                      <span class="badge" [class.badge--ok]="docsCount(r) === 2" [class.badge--warn]="docsCount(r) === 1">
+                        {{ docsCount(r) === 2 ? '✅ 2/2' : docsCount(r) === 1 ? '⚠️ 1/2' : '— 0/2' }}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="badge" [class.badge--ok]="fotosCount(r.id) > 0">{{ fotosCount(r.id) }}/4</span>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="7" class="empty-cell">
+                      {{ recepcionesLoading ? 'Cargando recepciones…' : (temporadaSeleccionada ? 'No hay recepciones registradas para esta temporada.' : 'Selecciona una temporada.') }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="table-footer">
+            El conteo de fotos solo refleja lo subido en esta sesión: el backend no expone un historial persistido por recepción.
+          </div>
+        </div>
+      }
+
+      <!-- ══════════════ FORMULARIO ══════════════ -->
+      @if (vista === 'form') {
+        <div class="form-card">
+          <div class="section-label">Información del contenedor</div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label" for="numeroContenedor">Número del contenedor <span class="required">*</span></label>
+              <input id="numeroContenedor" class="form-input mono" [class.form-input--error]="!!err('numero')"
+                [(ngModel)]="form.numeroContenedor" name="numeroContenedor" type="text"
+                placeholder="Ej: TCKU3453421" (ngModelChange)="form.numeroContenedor = form.numeroContenedor.toUpperCase()" />
+              @if (err('numero')) { <span class="field-error">⚠ {{ err('numero') }}</span> }
+            </div>
+            <div class="field">
+              <label class="field-label" for="fechaLlegada">Fecha de llegada <span class="required">*</span></label>
+              <input id="fechaLlegada" class="form-input" [class.form-input--error]="!!err('fecha')"
+                [(ngModel)]="form.fechaLlegada" name="fechaLlegada" type="date" (click)="abrirCalendario($event)" />
+              @if (err('fecha')) { <span class="field-error">⚠ {{ err('fecha') }}</span> }
+            </div>
+            <div class="field">
+              <label class="field-label" for="puntoEntregaId">Punto de entrega <span class="required">*</span></label>
+              <select id="puntoEntregaId" class="form-input form-select" [class.form-input--error]="!!err('punto')"
+                [(ngModel)]="form.puntoEntregaId" name="puntoEntregaId">
+                <option value="">{{ puntosLoading ? 'Cargando…' : 'Seleccionar punto' }}</option>
+                @for (p of puntos; track p.id) {
+                  <option [value]="p.id">{{ p.nombre }} — {{ p.ciudad }}</option>
+                }
+              </select>
+              @if (err('punto')) { <span class="field-error">⚠ {{ err('punto') }}</span> }
+            </div>
+            <div class="field">
+              <label class="field-label" for="temporadaFormSelect">Temporada <span class="required">*</span></label>
+              <select id="temporadaFormSelect" class="form-input form-select" [class.form-input--error]="!!err('temporada')"
+                [ngModel]="temporadaSeleccionada" (ngModelChange)="seleccionarTemporada($event)" name="temporadaFormSelect">
+                <option value="">Seleccionar temporada</option>
+                @for (t of temporadas; track t.id) {
+                  <option [value]="t.id">{{ t.nombre }}{{ t.esActual ? ' (actual)' : '' }}</option>
+                }
+              </select>
+              @if (err('temporada')) { <span class="field-error">⚠ {{ err('temporada') }}</span> }
+            </div>
+          </div>
+        </div>
+
+        @if (err('cajas')) {
+          <div class="error-banner">⚠ {{ err('cajas') }}</div>
+        }
+
+        <!-- Cajas -->
+        <div class="inv-card">
+          <div class="inv-header inv-header--azul">
+            <div>
+              <div class="inv-title">Cajas</div>
+              <div class="inv-subtitle">6 categorías estándar Samaritan's Purse</div>
+            </div>
+            @if (totalCajasForm > 0) { <div class="inv-total">{{ totalCajasForm.toLocaleString('es-CO') }} uds</div> }
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr><th>Categoría</th><th class="col-right">Cantidad recibida</th></tr>
+            </thead>
+            <tbody>
+              @for (c of CATEGORIAS_CAJA; track c.id) {
+                <tr>
+                  <td>
+                    <span class="row-icon">{{ c.icon }}</span>{{ c.descripcion }}
+                    <code class="row-codigo">{{ c.codigo }}</code>
+                  </td>
+                  <td class="col-right">
+                    <input class="qty-input" [class.qty-input--filled]="+cajas[c.id] > 0"
+                      type="number" min="0" [value]="cajas[c.id]" (input)="setCantidadCaja(c.id, $event)" placeholder="0" />
+                  </td>
+                </tr>
+              }
+              <tr class="inv-total-row">
+                <td>Total cajas (calculado automáticamente)</td>
+                <td class="col-right inv-total-value">{{ totalCajasForm.toLocaleString('es-CO') }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Literatura -->
+        <div class="inv-card">
+          <div class="inv-header inv-header--verde">
+            <div>
+              <div class="inv-title">Literatura</div>
+              <div class="inv-subtitle">Materiales por momento de la campaña</div>
+            </div>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr><th>Tipo</th><th class="col-right">Cantidad recibida</th></tr>
+            </thead>
+            <tbody>
+              @for (t of TIPOS_ITEM; track t.id) {
+                <tr>
+                  <td>
+                    {{ t.nombre }}
+                    <span class="momento-chip">Momento {{ t.momento }} · {{ MOMENTO_LABEL[t.momento] }}</span>
+                    <code class="row-codigo">{{ t.codigo }}</code>
+                  </td>
+                  <td class="col-right">
+                    <input class="qty-input" type="number" min="0" [value]="lit[t.id]" (input)="setCantidadLit(t.id, $event)" placeholder="0" />
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Observaciones -->
+        <div class="form-card">
+          <label class="field-label" for="observaciones">Observaciones</label>
+          <textarea id="observaciones" class="form-input form-textarea" [(ngModel)]="form.observaciones" name="observaciones"
+            rows="3" placeholder="Estado del contenedor, condiciones de entrega, novedades…"></textarea>
+          <div class="field-hint" style="margin-top:5px">
+            💡 Los documentos (lista transportadora, formato ABC) y fotos se adjuntan después de crear el registro.
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn-secondary" (click)="volverALista()" type="button">Cancelar</button>
+          <button class="btn-primary btn-primary--lg" (click)="registrarLlegada()" type="button" [disabled]="creando">
+            @if (creando) {
+              <span class="spinner-sm"></span> Registrando…
+            } @else {
+              📦 Registrar llegada
+            }
+          </button>
+        </div>
+      }
+
+      <!-- ══════════════ DETALLE ══════════════ -->
+      @if (vista === 'detalle' && seleccionada) {
+        <div class="detalle-header">
+          <div class="detalle-heading">
+            <div class="detalle-icon">📦</div>
+            <div>
+              <div class="detalle-titulo">Contenedor {{ seleccionada.numeroContenedor }}</div>
+              <div class="detalle-sub">ID #{{ seleccionada.id }} · Llegada: {{ fmtFecha(seleccionada.fechaLlegada) }}</div>
+            </div>
+          </div>
+          <div class="badge badge--ok">✅ Registrado</div>
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi-cell">
+            <div class="kpi-label">Punto de entrega</div>
+            <div class="kpi-value">{{ ptNombre(seleccionada.puntoEntregaId) }}</div>
+          </div>
+          <div class="kpi-cell">
+            <div class="kpi-label">Temporada</div>
+            <div class="kpi-value">{{ temporadaNombre(seleccionada.temporadaId) }}</div>
+          </div>
+          <div class="kpi-cell">
+            <div class="kpi-label">Total cajas</div>
+            <div class="kpi-value">{{ seleccionada.totalCajasRecibidas.toLocaleString('es-CO') }}</div>
+          </div>
+          <div class="kpi-cell">
+            <div class="kpi-label">Equipo ID</div>
+            <div class="kpi-value">#{{ seleccionada.equipoId }}</div>
+          </div>
+        </div>
+
+        @if (seleccionada.observaciones) {
+          <div class="observaciones-box">💬 {{ seleccionada.observaciones }}</div>
+        }
+
+        <div class="doble-grid">
+          <!-- Documentos -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">📄 Documentos oficiales</div>
+            </div>
+            <div class="panel-body">
+              <div class="doc-row">
+                <div class="doc-info">
+                  <div class="doc-label">Lista Transportadora</div>
+                  <div class="doc-desc">Documento oficial del transportista</div>
+                  @if (seleccionada.listaTransportadoraUrl) {
+                    <div class="doc-attached">✓ {{ seleccionada.listaTransportadoraUrl }}</div>
+                  }
+                </div>
+                <label class="btn-upload" [class.btn-upload--loading]="uploadingDoc.TRANSPORTADORA">
+                  <input type="file" class="sr-only-input" accept=".pdf,.png,.jpg,.jpeg"
+                    (change)="subirDocumento('TRANSPORTADORA', $event)" [disabled]="uploadingDoc.TRANSPORTADORA" />
+                  @if (uploadingDoc.TRANSPORTADORA) {
+                    <span class="spinner-sm spinner-sm--dark"></span> Subiendo…
+                  } @else {
+                    {{ seleccionada.listaTransportadoraUrl ? 'Reemplazar' : 'Subir' }}
+                  }
+                </label>
+              </div>
+              <div class="doc-row">
+                <div class="doc-info">
+                  <div class="doc-label">Documento ABC</div>
+                  <div class="doc-desc">Formato interno de verificación</div>
+                  @if (seleccionada.documentoAbcUrl) {
+                    <div class="doc-attached">✓ {{ seleccionada.documentoAbcUrl }}</div>
+                  }
+                </div>
+                <label class="btn-upload" [class.btn-upload--loading]="uploadingDoc.ABC">
+                  <input type="file" class="sr-only-input" accept=".pdf,.png,.jpg,.jpeg"
+                    (change)="subirDocumento('ABC', $event)" [disabled]="uploadingDoc.ABC" />
+                  @if (uploadingDoc.ABC) {
+                    <span class="spinner-sm spinner-sm--dark"></span> Subiendo…
+                  } @else {
+                    {{ seleccionada.documentoAbcUrl ? 'Reemplazar' : 'Subir' }}
+                  }
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fotos -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">📷 Fotos de evidencia</div>
+              <span class="badge" [class.badge--ok]="fotosCount(seleccionada.id) === 4">{{ fotosCount(seleccionada.id) }}/4</span>
+            </div>
+            <div class="panel-body">
+              <div class="photo-grid">
+                @for (i of [0,1,2,3]; track i) {
+                  @if (i < fotosCount(seleccionada.id)) {
+                    <div class="photo-thumb">
+                      <img [src]="fotosDe(seleccionada.id)[i]" alt="Foto {{ i + 1 }} del contenedor" class="photo-thumb__img" />
+                      <span class="photo-thumb__label">Foto {{ i + 1 }}</span>
+                    </div>
+                  } @else if (i === fotosCount(seleccionada.id)) {
+                    <label class="photo-add" [class.photo-add--loading]="uploadingFoto" [class.photo-add--primary]="i === 0">
+                      <input type="file" class="sr-only-input" accept="image/*" (change)="subirFoto($event)" [disabled]="uploadingFoto" />
+                      @if (uploadingFoto) {
+                        <span class="spinner-sm spinner-sm--dark"></span>
+                      } @else {
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        <span>+ Foto</span>
+                      }
+                    </label>
+                  } @else {
+                    <div class="photo-empty">·</div>
+                  }
+                }
+              </div>
+              <div class="foto-warning">
+                ⚠️ La <strong>foto #1</strong> debe mostrar el número del contenedor en la puerta. Es requerida para validar la trazabilidad.
+              </div>
+              @if (fotosCount(seleccionada.id) < 4) {
+                <div class="field-hint" style="text-align:center">Haz clic en el siguiente slot para subir. Máximo 4 fotos.</div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Inventario -->
+        <div class="panel-card">
+          <div class="panel-header"><div class="panel-title">📦 Inventario recibido</div></div>
+          <div class="doble-grid doble-grid--sin-gap">
+            <div class="inv-mitad">
+              <div class="inv-mitad-header inv-mitad-header--azul">📦 Cajas</div>
+              <table class="data-table">
+                <tbody>
+                  @for (d of cajasDetalle(seleccionada); track d.categoriaCajaId) {
+                    <tr>
+                      <td><code class="row-codigo">{{ d.codigoCategoria }}</code>{{ d.descripcionCategoria }}</td>
+                      <td class="col-right cell-cajas">{{ d.cantidad.toLocaleString('es-CO') }}</td>
+                    </tr>
+                  }
+                  <tr class="inv-total-row inv-total-row--azul">
+                    <td>Total</td>
+                    <td class="col-right">{{ seleccionada.totalCajasRecibidas.toLocaleString('es-CO') }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="inv-mitad">
+              <div class="inv-mitad-header inv-mitad-header--verde">📚 Literatura</div>
+              <table class="data-table">
+                <tbody>
+                  @for (d of literaturaDetalle(seleccionada); track d.tipoItemId) {
+                    <tr>
+                      <td><code class="row-codigo">{{ d.codigoItem }}</code></td>
+                      <td class="col-right cell-cajas">{{ d.cantidad.toLocaleString('es-CO') }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="2" class="empty-cell">Sin literatura registrada</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </main>
+</div>

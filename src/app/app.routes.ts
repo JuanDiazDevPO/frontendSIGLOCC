@@ -106,6 +106,13 @@ export const routes: Routes = [
         .then(m => m.CapacitacionesComponent)
   },
   {
+    path: 'recepciones',
+    canActivate: [authGuard, areaGuard('LOGISTICA')],
+    loadComponent: () =>
+      import('./recepcion-contenedores/recepcion-contenedores.component')
+        .then(m => m.RecepcionContenedoresComponent)
+  },
+  {
     path: 'usuarios',
     canActivate: [authGuard, roleGuard('ENL_RECURSOS', 'ENL_LOGISTICA', 'ADMIN')],
     loadComponent: () =>
