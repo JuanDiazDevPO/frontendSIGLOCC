@@ -67,6 +67,7 @@ export class Navtab {
     // Módulo Logístico: solo visible para roles _LOGISTICA, sin importar el
     // nivel jerárquico (ENL, ERLE o ERL).
     { section: 'Gestión Logística', area: 'LOGISTICA' },
+    { icon: '🗺️', label: 'Dashboard logística', route: '/logistica/dashboard', area: 'LOGISTICA' },
     { icon: '⛪', label: 'Iglesias',     route: '/iglesias',       area: 'LOGISTICA' },
     { icon: '📍', label: 'Puntos de Entrega', route: '/puntos-entrega', area: 'LOGISTICA' },
     { icon: '🚚', label: 'Entregas',     route: '/entregas',       area: 'LOGISTICA' },
