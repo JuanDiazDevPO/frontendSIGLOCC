@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Router } from '@angular/router';
 import { AuthService } from '../auth.service';
+import { homeRuta } from '../auth.guard';
 
 @Component({
   standalone: true,
@@ -26,8 +27,8 @@ export class LoginComponent {
       email: this.email,
       password: this.password
     }).subscribe({
-      next: () => {
-        this.router.navigate(['/dashboard']);
+      next: res => {
+        this.router.navigate([homeRuta(res.usuario.rol)]);
       },
       error: () => {
         this.error = 'Login inválido';
