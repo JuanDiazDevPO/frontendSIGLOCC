@@ -172,29 +172,31 @@
             </div>
             @if (totalCajasForm > 0) { <div class="inv-total">{{ totalCajasForm.toLocaleString('es-CO') }} uds</div> }
           </div>
-          <table class="data-table">
-            <thead>
-              <tr><th>Categoría</th><th class="col-right">Cantidad recibida</th></tr>
-            </thead>
-            <tbody>
-              @for (c of CATEGORIAS_CAJA; track c.id) {
-                <tr>
-                  <td>
-                    <span class="row-icon">{{ c.icon }}</span>{{ c.descripcion }}
-                    <code class="row-codigo">{{ c.codigo }}</code>
-                  </td>
-                  <td class="col-right">
-                    <input class="qty-input" [class.qty-input--filled]="+cajas[c.id] > 0"
-                      type="number" min="0" [value]="cajas[c.id]" (input)="setCantidadCaja(c.id, $event)" placeholder="0" />
-                  </td>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr><th>Categoría</th><th class="col-right">Cantidad recibida</th></tr>
+              </thead>
+              <tbody>
+                @for (c of CATEGORIAS_CAJA; track c.id) {
+                  <tr>
+                    <td>
+                      <span class="row-icon">{{ c.icon }}</span>{{ c.descripcion }}
+                      <code class="row-codigo">{{ c.codigo }}</code>
+                    </td>
+                    <td class="col-right">
+                      <input class="qty-input" [class.qty-input--filled]="+cajas[c.id] > 0"
+                        type="number" min="0" [value]="cajas[c.id]" (input)="setCantidadCaja(c.id, $event)" placeholder="0" />
+                    </td>
+                  </tr>
+                }
+                <tr class="inv-total-row">
+                  <td>Total cajas (calculado automáticamente)</td>
+                  <td class="col-right inv-total-value">{{ totalCajasForm.toLocaleString('es-CO') }}</td>
                 </tr>
-              }
-              <tr class="inv-total-row">
-                <td>Total cajas (calculado automáticamente)</td>
-                <td class="col-right inv-total-value">{{ totalCajasForm.toLocaleString('es-CO') }}</td>
-              </tr>
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Literatura -->
@@ -205,25 +207,27 @@
               <div class="inv-subtitle">Materiales por momento de la campaña</div>
             </div>
           </div>
-          <table class="data-table">
-            <thead>
-              <tr><th>Tipo</th><th class="col-right">Cantidad recibida</th></tr>
-            </thead>
-            <tbody>
-              @for (t of TIPOS_ITEM; track t.id) {
-                <tr>
-                  <td>
-                    {{ t.nombre }}
-                    <span class="momento-chip">Momento {{ t.momento }} · {{ MOMENTO_LABEL[t.momento] }}</span>
-                    <code class="row-codigo">{{ t.codigo }}</code>
-                  </td>
-                  <td class="col-right">
-                    <input class="qty-input" type="number" min="0" [value]="lit[t.id]" (input)="setCantidadLit(t.id, $event)" placeholder="0" />
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr><th>Tipo</th><th class="col-right">Cantidad recibida</th></tr>
+              </thead>
+              <tbody>
+                @for (t of TIPOS_ITEM; track t.id) {
+                  <tr>
+                    <td>
+                      {{ t.nombre }}
+                      <span class="momento-chip">Momento {{ t.momento }} · {{ MOMENTO_LABEL[t.momento] }}</span>
+                      <code class="row-codigo">{{ t.codigo }}</code>
+                    </td>
+                    <td class="col-right">
+                      <input class="qty-input" type="number" min="0" [value]="lit[t.id]" (input)="setCantidadLit(t.id, $event)" placeholder="0" />
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Observaciones -->
@@ -375,35 +379,39 @@
           <div class="doble-grid doble-grid--sin-gap">
             <div class="inv-mitad">
               <div class="inv-mitad-header inv-mitad-header--azul">📦 Cajas</div>
-              <table class="data-table">
-                <tbody>
-                  @for (d of cajasDetalle(seleccionada); track d.categoriaCajaId) {
-                    <tr>
-                      <td><code class="row-codigo">{{ d.codigoCategoria }}</code>{{ d.descripcionCategoria }}</td>
-                      <td class="col-right cell-cajas">{{ d.cantidad.toLocaleString('es-CO') }}</td>
+              <div class="table-scroll">
+                <table class="data-table">
+                  <tbody>
+                    @for (d of cajasDetalle(seleccionada); track d.categoriaCajaId) {
+                      <tr>
+                        <td><code class="row-codigo">{{ d.codigoCategoria }}</code>{{ d.descripcionCategoria }}</td>
+                        <td class="col-right cell-cajas">{{ d.cantidad.toLocaleString('es-CO') }}</td>
+                      </tr>
+                    }
+                    <tr class="inv-total-row inv-total-row--azul">
+                      <td>Total</td>
+                      <td class="col-right">{{ seleccionada.totalCajasRecibidas.toLocaleString('es-CO') }}</td>
                     </tr>
-                  }
-                  <tr class="inv-total-row inv-total-row--azul">
-                    <td>Total</td>
-                    <td class="col-right">{{ seleccionada.totalCajasRecibidas.toLocaleString('es-CO') }}</td>
-                  </tr>
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             </div>
             <div class="inv-mitad">
               <div class="inv-mitad-header inv-mitad-header--verde">📚 Literatura</div>
-              <table class="data-table">
-                <tbody>
-                  @for (d of literaturaDetalle(seleccionada); track d.tipoItemId) {
-                    <tr>
-                      <td><code class="row-codigo">{{ d.codigoItem }}</code></td>
-                      <td class="col-right cell-cajas">{{ d.cantidad.toLocaleString('es-CO') }}</td>
-                    </tr>
-                  } @empty {
-                    <tr><td colspan="2" class="empty-cell">Sin literatura registrada</td></tr>
-                  }
-                </tbody>
-              </table>
+              <div class="table-scroll">
+                <table class="data-table">
+                  <tbody>
+                    @for (d of literaturaDetalle(seleccionada); track d.tipoItemId) {
+                      <tr>
+                        <td><code class="row-codigo">{{ d.codigoItem }}</code></td>
+                        <td class="col-right cell-cajas">{{ d.cantidad.toLocaleString('es-CO') }}</td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="2" class="empty-cell">Sin literatura registrada</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>

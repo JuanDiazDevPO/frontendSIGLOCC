@@ -1,5 +1,6 @@
 import { Component, ChangeDetectorRef, DestroyRef, OnDestroy, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { forkJoin } from 'rxjs';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -22,6 +23,37 @@ interface PuntoEntrega {
   nombre: string;
   ciudad: string;
   departamento: string;
+}
+
+interface CategoriaCajaApi {
+  id: number;
+  codigo: string;
+  genero: 'NINO' | 'NINA';
+  edadMin: number;
+  edadMax: number;
+  descripcion: string;
+}
+
+interface TipoItemApi {
+  id: number;
+  codigo: string;
+  nombreCompleto: string;
+  aplicaNinos: boolean;
+  momento: number;
+}
+
+interface CategoriaCajaVm {
+  id: number;
+  codigo: string;
+  descripcion: string;
+  icon: string;
+}
+
+interface TipoItemVm {
+  id: number;
+  codigo: string;
+  nombre: string;
+  momento: number;
 }
 
 interface DetalleRecepcionRequest {
@@ -65,27 +97,17 @@ const EMPTY_FORM: FormRecepcion = {
   numeroContenedor: '', puntoEntregaId: '', fechaLlegada: '', observaciones: '',
 };
 
-// Catálogo verificado contra GET /v1/logistica/dashboard (inventarioPorCategoria):
-// los 6 ids son estables — el backend no expone un endpoint GET propio para este catálogo.
-const CATEGORIAS_CAJA = [
-  { id: 1, codigo: 'NINO_2_4', descripcion: 'Niño 2-4 años', icon: '👦' },
-  { id: 2, codigo: 'NINO_5_9', descripcion: 'Niño 5-9 años', icon: '👦' },
-  { id: 3, codigo: 'NINO_10_14', descripcion: 'Niño 10-14 años', icon: '👦' },
-  { id: 4, codigo: 'NINA_2_4', descripcion: 'Niña 2-4 años', icon: '👧' },
-  { id: 5, codigo: 'NINA_5_9', descripcion: 'Niña 5-9 años', icon: '👧' },
-  { id: 6, codigo: 'NINA_10_14', descripcion: 'Niña 10-14 años', icon: '👧' },
-];
+// El backend no distingue momento por tipo de item (GET /v1/logistica/tipos-item
+// devuelve `momento: 0` para todos); la agrupación Visión/Capacitación/Entrega que
+// muestra esta pantalla es una convención de UI, así que se mantiene por código.
+const MOMENTO_POR_CODIGO: Record<string, number> = {
+  FOLLETO: 1,
+  GM: 2, MPG: 2,
+  EMR: 3, LGA: 3, NT: 3,
+};
 
-// Catálogo verificado contra GET /v1/logistica/dashboard (literatura): id 1 = OE no está
-// en el diseño y se deja fuera; 2-7 confirmados con datos reales del backend de dev.
-const TIPOS_ITEM = [
-  { id: 2, codigo: 'FOLLETO', nombre: 'Folleto de Visión para pastores', momento: 1 },
-  { id: 3, codigo: 'GM', nombre: 'Guía Ministerial para maestros', momento: 2 },
-  { id: 4, codigo: 'MPG', nombre: 'Libro Presentación del Evangelio (maestros)', momento: 2 },
-  { id: 5, codigo: 'EMR', nombre: 'Cartilla El Mejor Regalo (niños)', momento: 3 },
-  { id: 6, codigo: 'LGA', nombre: 'Literatura LGA (niños)', momento: 3 },
-  { id: 7, codigo: 'NT', nombre: 'Nuevo Testamento (niños)', momento: 3 },
-];
+// OE (caja de regalo Operation Christmas) no está en el diseño de esta pantalla.
+const CODIGOS_ITEM_EXCLUIDOS = new Set(['OE']);
 
 const MOMENTO_LABEL: Record<number, string> = { 1: 'Visión', 2: 'Capacitación', 3: 'Entrega' };
 
@@ -105,9 +127,13 @@ export class RecepcionContenedoresComponent implements OnInit, OnDestroy {
   private readonly session = inject(SessionService);
   private readonly alert = inject(AlertService);
 
-  readonly CATEGORIAS_CAJA = CATEGORIAS_CAJA;
-  readonly TIPOS_ITEM = TIPOS_ITEM;
   readonly MOMENTO_LABEL = MOMENTO_LABEL;
+
+  // Catálogos de GET /v1/logistica/categorias-caja y /v1/logistica/tipos-item:
+  // no dependen de la temporada, se cargan una sola vez por sesión.
+  CATEGORIAS_CAJA: CategoriaCajaVm[] = [];
+  TIPOS_ITEM: TipoItemVm[] = [];
+  catalogoLoading = true;
 
   user: Usuario | null = this.session.getUser();
   vista: Vista = 'lista';
@@ -126,20 +152,35 @@ export class RecepcionContenedoresComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.temporadasLoading = true;
-    this.http
-      .get<Temporada[]>(`${environment.apiUrl}/v1/temporadas`)
+    this.catalogoLoading = true;
+    forkJoin({
+      temporadas: this.http.get<Temporada[]>(`${environment.apiUrl}/v1/temporadas`),
+      categoriasCaja: this.http.get<CategoriaCajaApi[]>(`${environment.apiUrl}/v1/logistica/categorias-caja`),
+      tiposItem: this.http.get<TipoItemApi[]>(`${environment.apiUrl}/v1/logistica/tipos-item`),
+    })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: data => {
-          this.temporadas = data;
+        next: ({ temporadas, categoriasCaja, tiposItem }: { temporadas: Temporada[]; categoriasCaja: CategoriaCajaApi[]; tiposItem: TipoItemApi[] }) => {
+          this.temporadas = temporadas;
+          this.CATEGORIAS_CAJA = categoriasCaja.map(c => ({
+            id: c.id,
+            codigo: c.codigo,
+            descripcion: c.descripcion,
+            icon: c.genero === 'NINA' ? '👧' : '👦',
+          }));
+          this.TIPOS_ITEM = tiposItem
+            .filter(t => !CODIGOS_ITEM_EXCLUIDOS.has(t.codigo))
+            .map(t => ({ id: t.id, codigo: t.codigo, nombre: t.nombreCompleto, momento: MOMENTO_POR_CODIGO[t.codigo] ?? 0 }));
           this.temporadasLoading = false;
-          const actual = data.find(t => t.esActual) ?? data[0];
+          this.catalogoLoading = false;
+          const actual = temporadas.find(t => t.esActual) ?? temporadas[0];
           if (actual) this.seleccionarTemporada(String(actual.id));
           this.cdr.detectChanges();
         },
         error: () => {
-          this.temporadasError = 'No se pudieron cargar las temporadas.';
+          this.temporadasError = 'No se pudieron cargar las temporadas o los catálogos de cajas/literatura.';
           this.temporadasLoading = false;
+          this.catalogoLoading = false;
           this.cdr.detectChanges();
         },
       });
@@ -254,8 +295,8 @@ export class RecepcionContenedoresComponent implements OnInit, OnDestroy {
 
   irAForm(): void {
     this.form = { ...EMPTY_FORM };
-    this.cajas = Object.fromEntries(CATEGORIAS_CAJA.map(c => [c.id, ''])) as Record<number, string>;
-    this.lit = Object.fromEntries(TIPOS_ITEM.map(t => [t.id, ''])) as Record<number, string>;
+    this.cajas = Object.fromEntries(this.CATEGORIAS_CAJA.map(c => [c.id, ''])) as Record<number, string>;
+    this.lit = Object.fromEntries(this.TIPOS_ITEM.map(t => [t.id, ''])) as Record<number, string>;
     this.errors = {};
     this.submitted = false;
     this.vista = 'form';
@@ -270,14 +311,14 @@ export class RecepcionContenedoresComponent implements OnInit, OnDestroy {
   //  Formulario de creación (POST /v1/logistica/recepciones)
   // ═══════════════════════════════════════════════════════════
   form: FormRecepcion = { ...EMPTY_FORM };
-  cajas: Record<number, string> = Object.fromEntries(CATEGORIAS_CAJA.map(c => [c.id, '']));
-  lit: Record<number, string> = Object.fromEntries(TIPOS_ITEM.map(t => [t.id, '']));
+  cajas: Record<number, string> = {};
+  lit: Record<number, string> = {};
   errors: Record<string, string> = {};
   submitted = false;
   creando = false;
 
   get totalCajasForm(): number {
-    return CATEGORIAS_CAJA.reduce((s, c) => s + (parseInt(this.cajas[c.id], 10) || 0), 0);
+    return this.CATEGORIAS_CAJA.reduce((s, c) => s + (parseInt(this.cajas[c.id], 10) || 0), 0);
   }
 
   setCantidadCaja(id: number, event: Event): void {
@@ -316,9 +357,9 @@ export class RecepcionContenedoresComponent implements OnInit, OnDestroy {
     this.creando = true;
 
     const detalles: DetalleRecepcionRequest[] = [
-      ...CATEGORIAS_CAJA.filter(c => (parseInt(this.cajas[c.id], 10) || 0) > 0)
+      ...this.CATEGORIAS_CAJA.filter(c => (parseInt(this.cajas[c.id], 10) || 0) > 0)
         .map(c => ({ categoriaCajaId: c.id, tipoItemId: null, cantidad: parseInt(this.cajas[c.id], 10) })),
-      ...TIPOS_ITEM.filter(t => (parseInt(this.lit[t.id], 10) || 0) > 0)
+      ...this.TIPOS_ITEM.filter(t => (parseInt(this.lit[t.id], 10) || 0) > 0)
         .map(t => ({ categoriaCajaId: null, tipoItemId: t.id, cantidad: parseInt(this.lit[t.id], 10) })),
     ];
 

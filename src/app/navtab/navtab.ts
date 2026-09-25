@@ -50,7 +50,7 @@ export class Navtab {
     { section: 'Administración', roles: CORE_ROLES },
     { icon: '👥', label: 'Usuarios',   route: '/usuarios',              roles: CORE_ROLES },
     { icon: '📅', label: 'Temporadas', route: '/temporadas',           roles: CORE_ROLES },
-    { icon: '⚙', label: 'Parámetros', route: '/temporadas/parametros', roles: CORE_ROLES },
+    { icon: '⚙', label: 'Parámetros', route: '/temporadas/parametros', roles: ['ENL_RECURSOS', 'ADMIN'] },
 
     // Módulo Financiero: solo visible para roles _RECURSOS, sin importar el
     // nivel jerárquico (ENL, ERLE o ERL). El dashboard financiero vivía suelto arriba
