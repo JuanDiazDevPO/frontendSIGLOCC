@@ -42,9 +42,12 @@ interface ConsolidadoItem {
   equipoNombre: string;
   equipoTipo: RolScope;
   presupuestoEntrenamiento: number;
+  ejecutadoEntrenamiento: number;
   saldoEntrenamiento: number;
   presupuestoMentoreo: number;
+  ejecutadoMentoreo: number;
   saldoMentoreo: number;
+  granTotalEjecutado: number;
 }
 
 interface TemporadaApi {
@@ -68,6 +71,8 @@ interface Bucket {
   /** Nombre del campo del API que se muestra en el drill-down. */
   campoSaldo: 'saldoEntrenamiento' | 'saldoMentoreo';
   campoPresupuesto: 'presupuestoEntrenamiento' | 'presupuestoMentoreo';
+  /** Ejecutado ya sin E-0/M-0, calculado por el backend (vista_control_saldos_enl). */
+  campoEjecutado: 'ejecutadoEntrenamiento' | 'ejecutadoMentoreo';
 }
 
 interface EjecutadoEquipo {
@@ -88,8 +93,8 @@ interface FilaMatriz {
 // La vista vista_dashboard_financiero solo separa 2 bolsas, no 3 familias:
 // entrenamiento (familia E) y mentoreo (familias M y O juntas).
 const BUCKETS: Bucket[] = [
-  { id: 'E',  familias: ['E'],      label: 'Entrenamiento',    icon: '📚', campoSaldo: 'saldoEntrenamiento', campoPresupuesto: 'presupuestoEntrenamiento' },
-  { id: 'MO', familias: ['M', 'O'], label: 'Mentoreo + Otros', icon: '🤝', campoSaldo: 'saldoMentoreo',      campoPresupuesto: 'presupuestoMentoreo' },
+  { id: 'E',  familias: ['E'],      label: 'Entrenamiento',    icon: '📚', campoSaldo: 'saldoEntrenamiento', campoPresupuesto: 'presupuestoEntrenamiento', campoEjecutado: 'ejecutadoEntrenamiento' },
+  { id: 'MO', familias: ['M', 'O'], label: 'Mentoreo + Otros', icon: '🤝', campoSaldo: 'saldoMentoreo',      campoPresupuesto: 'presupuestoMentoreo',      campoEjecutado: 'ejecutadoMentoreo' },
 ];
 
 const FAMILIA_LABEL: Record<Familia, { label: string; icon: string }> = {
@@ -298,12 +303,14 @@ export class AnalisisGastosComponent implements OnInit {
     this.filas = visibles.map(equipo => {
       const ejecutado = ejecutados.get(equipo.equipoId)
         ?? { porCat: {}, porFam: { E: 0, M: 0, O: 0 }, total: 0 };
+      // Subtotales y total de fila salen de consolidado (ya excluye E-0/M-0 en backend);
+      // ejecutado.porFam/porCat quedan crudos para las columnas individuales de la matriz.
       const buckets = this.bucketsVisibles.map(bucket => {
-        const ejec = bucket.familias.reduce((s, f) => s + ejecutado.porFam[f], 0);
+        const ejec = equipo[bucket.campoEjecutado] ?? 0;
         const presupuesto = equipo[bucket.campoPresupuesto] ?? 0;
         return { bucket, ejecutado: ejec, presupuesto, pct: this.pct(ejec, presupuesto) };
       });
-      const total = famsVisibles.reduce((s, f) => s + ejecutado.porFam[f], 0);
+      const total = buckets.reduce((s, b) => s + b.ejecutado, 0);
       return { equipo, ejecutado, buckets, total, indentPx: INDENT_PX[equipo.equipoTipo] ?? 0 };
     });
 
