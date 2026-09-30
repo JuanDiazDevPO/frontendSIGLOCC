@@ -1,4 +1,4 @@
 export const environment = {
   production: false,
-  apiUrl: 'https://dev.siglocc.org/api'
+  apiUrl: 'https://api.siglocc.org/api'
 };
