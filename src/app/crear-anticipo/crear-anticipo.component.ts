@@ -79,7 +79,7 @@ export class CrearAnticipoComponent {
   loading = false;
   downloadingPdf = false;
   submitted = false;
-  result: AnticipResult | null = null;
+  result: (AnticipResult & { exitosa: boolean }) | null = null;
   errors: Record<string, string> = {};
 
   // Real: GET /v1/anticipos/mis-saldos. Antes venían quemados (3.900.000 / 6.300.000)
@@ -138,6 +138,16 @@ export class CrearAnticipoComponent {
           this.cdr.detectChanges();
         },
       });
+  }
+
+  // Estados exitosos: PENDIENTE_ERLE (ERL), PENDIENTE_ENL (ERLE) o APROBADO (autoaprobado, ENL).
+  get tituloExito(): string {
+    switch (this.result?.estado) {
+      case 'PENDIENTE_ERLE': return 'Solicitud enviada a tu ERLE';
+      case 'PENDIENTE_ENL': return 'Solicitud enviada al ENL';
+      case 'APROBADO': return 'Solicitud aprobada';
+      default: return 'Solicitud enviada';
+    }
   }
 
   get montoNum(): number { return Number(this.form.montoSolicitado) || 0; }
@@ -245,7 +255,7 @@ export class CrearAnticipoComponent {
       .subscribe({
         next: res => {
           this.loading = false;
-          this.result = res;
+          this.result = { ...res, exitosa: res.estado !== 'RECHAZADO' };
           this.cdr.detectChanges();
         },
         error: (err: HttpErrorResponse) => {
@@ -255,6 +265,7 @@ export class CrearAnticipoComponent {
             estado: 'ERROR',
             mensaje: this.httpErrorMessage(err),
             rutaPdf: null,
+            exitosa: false,
           };
           this.cdr.detectChanges();
         },

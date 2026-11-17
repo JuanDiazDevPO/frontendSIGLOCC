@@ -373,7 +373,8 @@
 .status-badge--big { font-size: 12px; padding: 4px 11px; }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
-.status-badge--pendiente { background: #fef3c7; color: #92400e; }
+.status-badge--pendiente_erle { background: #fef3c7; color: #92400e; }
+.status-badge--pendiente_enl { background: #dbeafe; color: #1d4ed8; }
 .status-badge--aprobado { background: #dcfce7; color: #15803d; }
 .status-badge--rechazado { background: #fee2e2; color: #b91c1c; }
 
@@ -737,3 +738,48 @@
 }
 
 .modal-actions { display: flex; gap: 8px; }
+
+/* ── Acciones aprobar / rechazar ─────────────────────────── */
+.row-actions { display: flex; gap: 6px; }
+.btn-row-action--danger { background: white; color: #b91c1c; border: 1.5px solid #fca5a5; }
+
+.btn-reject {
+  padding: 9px 22px;
+  border-radius: 8px;
+  border: 1.5px solid #fca5a5;
+  background: white;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn-reject:hover { background: #fef2f2; }
+
+.btn-confirm--danger { background: #b91c1c; }
+.modal-icon--danger { background: #fee2e2; color: #b91c1c; }
+.modal-main { flex: 1; min-width: 0; }
+.field-label { display: block; margin: 12px 0 6px; font-size: 12px; font-weight: 600; color: #374151; }
+.accion-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 11px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+  margin-bottom: 6px;
+}
+.accion-textarea:focus { outline: none; border-color: var(--color-primary); }
+.rechazo-box__meta { margin-top: 6px; font-size: 11.5px; color: #991b1b; }
+
+/* ── Timeline ────────────────────────────────────────────── */
+.timeline { list-style: none; margin: 0 0 8px; padding: 0 0 0 4px; display: flex; flex-direction: column; gap: 12px; }
+.timeline__item { display: flex; gap: 11px; align-items: flex-start; }
+.timeline__dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; background: #d1d5db; }
+.timeline__item--done .timeline__dot { background: #15803d; }
+.timeline__item--current .timeline__dot { background: #f59e0b; box-shadow: 0 0 0 3px #fef3c7; }
+.timeline__item--rejected .timeline__dot { background: #b91c1c; }
+.timeline__title { font-size: 13px; font-weight: 600; color: #1f2937; }
+.timeline__sub { font-size: 11.5px; color: var(--color-text-muted); }

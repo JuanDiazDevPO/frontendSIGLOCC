@@ -60,7 +60,7 @@ export class Navtab {
     { section: 'Gestión Financiera', area: 'RECURSOS' },
     { icon: '◈', label: 'Dashboard financiero', route: '/dashboard', area: 'RECURSOS' },
     { icon: '💰', label: 'Anticipos',            route: '/anticipos/crear',        area: 'RECURSOS' },
-    { icon: '🏦', label: 'Gestión de anticipos', route: '/anticipos/gestion',      roles: ['ENL_RECURSOS'] },
+    { icon: '🏦', label: 'Gestión de anticipos', route: '/anticipos/gestion',      roles: ['ENL_RECURSOS', 'ERLE_RECURSOS'] },
     { icon: '📊', label: 'Presupuestos',         route: '/presupuestos/crear',     roles: ['ENL_RECURSOS'] },
     { icon: '📝', label: 'Reporte de gastos',    route: '/reportes/mensual',       area: 'RECURSOS' },
     { icon: '✅', label: 'Gestión de reportes',  route: '/reportes/gestion',       area: 'RECURSOS' },

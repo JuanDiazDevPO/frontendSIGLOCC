@@ -10,8 +10,10 @@ import { Usuario } from '../auth.models';
 import { environment } from '../../environments/environment';
 
 type TipoPresupuesto = 'ENTRENAMIENTO' | 'MENTOREO';
-type EstadoAnticipo = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
-type FiltroEstado = 'PENDIENTE' | 'todos' | 'APROBADO' | 'RECHAZADO';
+type EstadoAnticipo = 'PENDIENTE_ERLE' | 'PENDIENTE_ENL' | 'APROBADO' | 'RECHAZADO';
+type FiltroEstado = 'pendientes_mios' | 'en_proceso' | 'todos' | 'APROBADO' | 'RECHAZADO';
+type RolScope = 'ERLE' | 'ENL' | '';
+type AccionAnticipo = 'aprobar' | 'rechazar';
 
 interface AnticipoItem {
   id: number;
@@ -31,8 +33,15 @@ interface AnticipoItem {
   equipoId: number;
   equipoNombre: string;
   rutaPdf: string | null;
+  temporadaId: number;
+  usuarioId: number;
   fechaSolicitud: string;
+  aprobadorErleId: number | null;
+  fechaAprobacionErle: string | null;
+  aprobadorEnlId: number | null;
   fechaAprobacionFinal: string | null;
+  rechazadoPorId: number | null;
+  fechaRechazo: string | null;
 }
 
 interface RubroSaldo {
@@ -49,7 +58,7 @@ interface SaldosEquipo {
   mentoreo: RubroSaldo;
 }
 
-interface AprobarResponse {
+interface CambioEstadoResponse {
   id: number;
   estado: string;
   mensaje: string;
@@ -69,10 +78,18 @@ const TIPO_PRES: Record<TipoPresupuesto, TipoPresMeta> = {
 };
 
 const ESTADO_LABEL: Record<EstadoAnticipo, string> = {
-  PENDIENTE: 'Pendiente',
+  PENDIENTE_ERLE: 'Pend. ERLE',
+  PENDIENTE_ENL: 'Pend. ENL',
   APROBADO: 'Aprobado',
   RECHAZADO: 'Rechazado',
 };
+
+function rolScopeDe(rol: string | undefined): RolScope {
+  if (!rol) return '';
+  if (rol.startsWith('ERLE')) return 'ERLE';
+  if (rol.startsWith('ENL')) return 'ENL';
+  return '';
+}
 
 @Component({
   standalone: true,
@@ -95,18 +112,27 @@ export class GestionAnticiposComponent implements OnInit {
 
   @HostListener('document:keydown.escape')
   onEscapeKey(): void {
-    if (this.aprobarTarget) this.closeAprobar();
+    if (this.accionTarget) this.closeAccion();
     else if (this.detalle) this.closeDetalle();
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  Listado (real: GET /v1/anticipos — bandeja nacional, solo ENL_RECURSOS)
+  //  Listado (real: GET /v1/anticipos — ENL ve todo; ERLE su equipo + ERL de su clúster.
+  //  El backend ya filtra por jerarquía, el front no filtra por equipo)
   // ═══════════════════════════════════════════════════════════
   anticipos: AnticipoItem[] = [];
   anticiposLoading = false;
   anticiposError: string | null = null;
   search = '';
-  filtroEstado: FiltroEstado = 'PENDIENTE';
+  readonly rolScope: RolScope = rolScopeDe(this.session.getUser()?.rol);
+  filtroEstado: FiltroEstado = 'pendientes_mios';
+
+  // Estado en el que el rol del usuario es quien debe actuar.
+  get estadoPendienteMio(): EstadoAnticipo | null {
+    if (this.rolScope === 'ERLE') return 'PENDIENTE_ERLE';
+    if (this.rolScope === 'ENL') return 'PENDIENTE_ENL';
+    return null;
+  }
 
   ngOnInit(): void {
     this.cargarAnticipos();
@@ -133,20 +159,29 @@ export class GestionAnticiposComponent implements OnInit {
       });
   }
 
+  private coincideEstado(a: AnticipoItem, f: FiltroEstado): boolean {
+    switch (f) {
+      case 'todos': return true;
+      case 'pendientes_mios': return a.estado === this.estadoPendienteMio;
+      case 'en_proceso': return a.estado === 'PENDIENTE_ERLE' || a.estado === 'PENDIENTE_ENL';
+      default: return a.estado === f;
+    }
+  }
+
   get filtrados(): AnticipoItem[] {
     const term = this.search.trim().toLowerCase();
     return this.anticipos.filter(a => {
       const matchSearch = !term || `${a.titulo} ${a.equipoNombre} ${a.nombreTitular} #${a.id}`.toLowerCase().includes(term);
-      const matchEstado = this.filtroEstado === 'todos' || a.estado === this.filtroEstado;
-      return matchSearch && matchEstado;
+      return matchSearch && this.coincideEstado(a, this.filtroEstado);
     });
   }
 
   get kpi() {
-    const pendientes = this.anticipos.filter(a => a.estado === 'PENDIENTE');
+    const mios = this.anticipos.filter(a => a.estado === this.estadoPendienteMio);
     return {
-      pendientes: pendientes.length,
-      montoPendiente: pendientes.reduce((s, a) => s + a.montoSolicitado, 0),
+      pendientes: mios.length,
+      montoPendiente: mios.reduce((s, a) => s + a.montoSolicitado, 0),
+      enProceso: this.anticipos.filter(a => this.coincideEstado(a, 'en_proceso')).length,
       aprobados: this.anticipos.filter(a => a.estado === 'APROBADO').length,
       rechazados: this.anticipos.filter(a => a.estado === 'RECHAZADO').length,
     };
@@ -264,44 +299,78 @@ export class GestionAnticiposComponent implements OnInit {
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  Aprobar (real: PATCH /v1/anticipos/{id}/aprobar) — solo ENL_RECURSOS
+  //  Aprobar / rechazar (real: PATCH /v1/anticipos/{id}/estado)
+  //  ERLE: PENDIENTE_ERLE → PENDIENTE_ENL | RECHAZADO
+  //  ENL:  PENDIENTE_ENL  → APROBADO      | RECHAZADO
   // ═══════════════════════════════════════════════════════════
-  get canAprobar(): boolean {
-    return this.user?.rol === 'ENL_RECURSOS';
+  puedeActuar(a: AnticipoItem): boolean {
+    return this.estadoPendienteMio !== null && a.estado === this.estadoPendienteMio;
   }
 
-  aprobarTarget: AnticipoItem | null = null;
-  aprobando = false;
-
-  openAprobar(a: AnticipoItem): void {
-    this.aprobarTarget = a;
+  // Explica por qué el usuario no puede actuar sobre un anticipo.
+  motivoSinAccion(a: AnticipoItem): string | null {
+    if (this.puedeActuar(a)) return null;
+    if (a.estado === 'APROBADO' || a.estado === 'RECHAZADO') return null;
+    if (this.rolScope === 'ERLE' && a.estado === 'PENDIENTE_ENL') return 'Este anticipo ya pasó tu revisión. Está esperando la aprobación del ENL.';
+    if (this.rolScope === 'ENL' && a.estado === 'PENDIENTE_ERLE') return 'Este anticipo aún no ha sido revisado por el ERLE de su clúster.';
+    return null;
   }
 
-  closeAprobar(): void {
-    if (this.aprobando) return;
-    this.aprobarTarget = null;
+  accionTarget: { anticipo: AnticipoItem; accion: AccionAnticipo } | null = null;
+  accionObservaciones = '';
+  accionLoading = false;
+
+  get accionNuevoEstado(): EstadoAnticipo | null {
+    const t = this.accionTarget;
+    if (!t) return null;
+    if (t.accion === 'rechazar') return 'RECHAZADO';
+    return this.rolScope === 'ERLE' ? 'PENDIENTE_ENL' : 'APROBADO';
   }
 
-  confirmarAprobar(): void {
-    const a = this.aprobarTarget;
-    if (!a || this.aprobando) return;
-    this.aprobando = true;
+  get accionRechazoValido(): boolean {
+    return this.accionObservaciones.trim().length > 0;
+  }
+
+  openAccion(a: AnticipoItem, accion: AccionAnticipo): void {
+    this.accionTarget = { anticipo: a, accion };
+    this.accionObservaciones = '';
+  }
+
+  closeAccion(): void {
+    if (this.accionLoading) return;
+    this.accionTarget = null;
+  }
+
+  confirmarAccion(): void {
+    const t = this.accionTarget;
+    const nuevoEstado = this.accionNuevoEstado;
+    if (!t || !nuevoEstado || this.accionLoading) return;
+    if (t.accion === 'rechazar' && !this.accionRechazoValido) return;
+    const a = t.anticipo;
+    this.accionLoading = true;
 
     this.http
-      .patch<AprobarResponse>(`${environment.apiUrl}/v1/anticipos/${a.id}/aprobar`, {})
+      .patch<CambioEstadoResponse>(`${environment.apiUrl}/v1/anticipos/${a.id}/estado`, {
+        nuevoEstado,
+        observaciones: this.accionObservaciones.trim() || null,
+      })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: res => {
-          this.aprobando = false;
-          this.aprobarTarget = null;
-          const fechaAprobacionFinal = new Date().toISOString();
-          this.anticipos = this.anticipos.map(x => (x.id === a.id ? { ...x, estado: 'APROBADO', fechaAprobacionFinal } : x));
-          if (this.detalle?.id === a.id) this.detalle = { ...this.detalle, estado: 'APROBADO', fechaAprobacionFinal };
-          this.alert.success(res.mensaje || `Anticipo #${a.id} aprobado.`);
+          this.accionLoading = false;
+          this.accionTarget = null;
+          this.detalle = null;
+          if (nuevoEstado === 'RECHAZADO') {
+            this.alert.error(res.mensaje || `Anticipo #${a.id} rechazado.`);
+          } else {
+            this.alert.success(res.mensaje || `Anticipo #${a.id} → ${ESTADO_LABEL[nuevoEstado]}.`);
+          }
+          // Cambian varios campos (aprobadores, fechas, motivo): se recarga el listado.
+          this.cargarAnticipos();
           this.cdr.detectChanges();
         },
         error: (err: HttpErrorResponse) => {
-          this.aprobando = false;
+          this.accionLoading = false;
           this.alert.error(this.httpErrorMessage(err));
           this.cdr.detectChanges();
         },

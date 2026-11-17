@@ -13,28 +13,28 @@
     @if (result) {
       <div class="result-screen">
         <div class="result-card">
-          <div class="result-icon" [class.result-icon--ok]="result.estado === 'PENDIENTE'" [class.result-icon--err]="result.estado !== 'PENDIENTE'">
-            {{ result.estado === 'PENDIENTE' ? '✅' : '❌' }}
+          <div class="result-icon" [class.result-icon--ok]="result.exitosa" [class.result-icon--err]="!result.exitosa">
+            {{ result.exitosa ? '✅' : '❌' }}
           </div>
 
           <div class="result-text">
             <div class="result-title">
-              {{ result.estado === 'PENDIENTE' ? 'Solicitud enviada' : result.estado === 'ERROR' ? 'Error de conexión' : 'Solicitud rechazada' }}
+              {{ result.exitosa ? tituloExito : result.estado === 'ERROR' ? 'Error de conexión' : 'Solicitud rechazada' }}
             </div>
             <div class="result-message">{{ result.mensaje }}</div>
           </div>
 
-          <div class="result-status-box" [class.result-status-box--ok]="result.estado === 'PENDIENTE'" [class.result-status-box--err]="result.estado !== 'PENDIENTE'">
+          <div class="result-status-box" [class.result-status-box--ok]="result.exitosa" [class.result-status-box--err]="!result.exitosa">
             <div>
               <div class="result-estado-label">Estado</div>
-              <div class="result-estado-value" [class.result-estado-value--ok]="result.estado === 'PENDIENTE'" [class.result-estado-value--err]="result.estado !== 'PENDIENTE'">
+              <div class="result-estado-value" [class.result-estado-value--ok]="result.exitosa" [class.result-estado-value--err]="!result.exitosa">
                 {{ result.estado }}
               </div>
               @if (result.id) {
                 <div class="result-id">ID #{{ result.id }}</div>
               }
             </div>
-            @if (result.estado === 'PENDIENTE' && result.id) {
+            @if (result.exitosa && result.id) {
               <button class="btn-download" [class.btn-download--loading]="downloadingPdf" [disabled]="downloadingPdf" (click)="downloadPdf()" type="button">
                 @if (downloadingPdf) {
                   <span class="spinner-sm"></span>
@@ -53,7 +53,7 @@
               <button class="btn-outline" (click)="reset()" type="button">Corregir y reenviar</button>
             }
             <button class="btn-primary" (click)="reset()" type="button">
-              {{ result.estado === 'PENDIENTE' ? 'Nueva solicitud' : 'Cancelar' }}
+              {{ result.exitosa ? 'Nueva solicitud' : 'Cancelar' }}
             </button>
           </div>
         </div>

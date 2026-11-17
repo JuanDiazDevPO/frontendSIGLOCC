@@ -44,7 +44,7 @@ export const routes: Routes = [
   },
   {
     path: 'anticipos/gestion',
-    canActivate: [authGuard, roleGuard('ENL_RECURSOS')],
+    canActivate: [authGuard, roleGuard('ENL_RECURSOS', 'ERLE_RECURSOS')],
     loadComponent: () =>
       import('./gestion-anticipos/gestion-anticipos.component')
         .then(m => m.GestionAnticiposComponent)
