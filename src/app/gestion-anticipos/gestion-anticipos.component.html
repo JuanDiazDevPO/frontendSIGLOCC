@@ -39,13 +39,13 @@
 
       <!-- KPIs -->
       <div class="stats-grid">
-        <div class="stat-card stat-card--pending" [class.stat-card--active]="filtroEstado === 'PENDIENTE'" (click)="toggleFiltro('PENDIENTE')" role="button" tabindex="0" (keydown.enter)="toggleFiltro('PENDIENTE')">
+        <div class="stat-card stat-card--pending" [class.stat-card--active]="filtroEstado === 'pendientes_mios'" (click)="toggleFiltro('pendientes_mios')" role="button" tabindex="0" (keydown.enter)="toggleFiltro('pendientes_mios')">
           <div class="stat-value stat-value--pending">{{ kpi.pendientes }}</div>
-          <div class="stat-label">Por aprobar</div>
+          <div class="stat-label">Por aprobar (mías)</div>
         </div>
         <div class="stat-card">
           <div class="stat-value stat-value--accent">{{ cop(kpi.montoPendiente) }}</div>
-          <div class="stat-label">Monto pendiente</div>
+          <div class="stat-label">Monto por aprobar</div>
         </div>
         <div class="stat-card stat-card--ok" [class.stat-card--active]="filtroEstado === 'APROBADO'" (click)="toggleFiltro('APROBADO')" role="button" tabindex="0" (keydown.enter)="toggleFiltro('APROBADO')">
           <div class="stat-value stat-value--ok">{{ kpi.aprobados }}</div>
@@ -60,7 +60,8 @@
       <!-- Filtros + búsqueda -->
       <div class="toolbar">
         <div class="filter-tabs">
-          <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'PENDIENTE'" (click)="toggleFiltro('PENDIENTE')" type="button">Por aprobar ({{ kpi.pendientes }})</button>
+          <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'pendientes_mios'" (click)="toggleFiltro('pendientes_mios')" type="button">Por aprobar ({{ kpi.pendientes }})</button>
+          <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'en_proceso'" (click)="toggleFiltro('en_proceso')" type="button">En proceso ({{ kpi.enProceso }})</button>
           <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'todos'" (click)="toggleFiltro('todos')" type="button">Todos</button>
           <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'APROBADO'" (click)="toggleFiltro('APROBADO')" type="button">Aprobados</button>
           <button class="filter-tab" [class.filter-tab--active]="filtroEstado === 'RECHAZADO'" (click)="toggleFiltro('RECHAZADO')" type="button">Rechazados</button>
@@ -101,7 +102,7 @@
                 </tr>
               } @else {
                 @for (a of filtrados; track a.id) {
-                  <tr class="anticipo-row" [class.anticipo-row--pendiente]="a.estado === 'PENDIENTE'" (click)="abrirDetalle(a)" role="button" tabindex="0" (keydown.enter)="abrirDetalle(a)">
+                  <tr class="anticipo-row" [class.anticipo-row--pendiente]="puedeActuar(a)" (click)="abrirDetalle(a)" role="button" tabindex="0" (keydown.enter)="abrirDetalle(a)">
                     <td class="col-id">#{{ a.id }}</td>
                     <td>
                       <div class="cell-title">{{ a.titulo }}</div>
@@ -113,11 +114,14 @@
                     <td><span class="status-badge" [class]="'status-badge--' + a.estado.toLowerCase()"><span class="status-dot"></span>{{ ESTADO_LABEL[a.estado] }}</span></td>
                     <td class="cell-muted nowrap">{{ fmtFecha(a.fechaSolicitud) }}</td>
                     <td (click)="$event.stopPropagation()">
-                      @if (a.estado === 'PENDIENTE' && canAprobar) {
-                        <button class="btn-row-action btn-row-action--primary" (click)="openAprobar(a)" type="button">
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                          Aprobar
-                        </button>
+                      @if (puedeActuar(a)) {
+                        <div class="row-actions">
+                          <button class="btn-row-action btn-row-action--primary" (click)="openAccion(a, 'aprobar')" type="button">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Aprobar
+                          </button>
+                          <button class="btn-row-action btn-row-action--danger" (click)="openAccion(a, 'rechazar')" type="button">Rechazar</button>
+                        </div>
                       } @else {
                         <button class="btn-row-action" (click)="abrirDetalle(a)" type="button">Ver detalle</button>
                       }
@@ -162,15 +166,65 @@
           <div class="monto-box__value">{{ cop(detalle.montoSolicitado) }}</div>
         </div>
 
-        @if (detalle.estado === 'RECHAZADO' && detalle.motivoRechazo) {
+        @if (detalle.estado === 'RECHAZADO') {
           <div class="rechazo-box">
             <div class="rechazo-box__title">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              Rechazo automático
+              {{ detalle.rechazadoPorId === null ? 'Rechazo automático por saldo insuficiente' : 'Rechazado manualmente' }}
             </div>
-            <div class="rechazo-box__desc">{{ detalle.motivoRechazo }}</div>
+            <div class="rechazo-box__desc">{{ detalle.motivoRechazo || 'Sin motivo registrado.' }}</div>
+            @if (detalle.rechazadoPorId !== null) {
+              <div class="rechazo-box__meta">{{ fmtFechaHora(detalle.fechaRechazo) }}</div>
+            }
           </div>
         }
+
+        <div>
+          <div class="section-label">Seguimiento</div>
+          <ol class="timeline">
+            <li class="timeline__item timeline__item--done">
+              <span class="timeline__dot"></span>
+              <div><div class="timeline__title">Solicitado</div><div class="timeline__sub">{{ fmtFechaHora(detalle.fechaSolicitud) }}</div></div>
+            </li>
+            @if (detalle.aprobadorErleId !== null) {
+              <li class="timeline__item timeline__item--done">
+                <span class="timeline__dot"></span>
+                <div><div class="timeline__title">Aprobado por ERLE</div><div class="timeline__sub">{{ fmtFechaHora(detalle.fechaAprobacionErle) }}</div></div>
+              </li>
+            } @else if (detalle.estado === 'PENDIENTE_ERLE') {
+              <li class="timeline__item timeline__item--current">
+                <span class="timeline__dot"></span>
+                <div><div class="timeline__title">Esperando al ERLE</div></div>
+              </li>
+            }
+            @if (detalle.estado === 'PENDIENTE_ENL') {
+              <li class="timeline__item timeline__item--current">
+                <span class="timeline__dot"></span>
+                <div><div class="timeline__title">Esperando al ENL</div></div>
+              </li>
+            }
+            @if (detalle.estado === 'APROBADO') {
+              <li class="timeline__item timeline__item--done">
+                <span class="timeline__dot"></span>
+                <div><div class="timeline__title">Aprobación final (ENL)</div><div class="timeline__sub">{{ fmtFechaHora(detalle.fechaAprobacionFinal) }}</div></div>
+              </li>
+            }
+            @if (detalle.estado === 'RECHAZADO') {
+              <li class="timeline__item timeline__item--rejected">
+                <span class="timeline__dot"></span>
+                <div>
+                  <div class="timeline__title">{{ detalle.rechazadoPorId === null ? 'Rechazado por el sistema' : 'Rechazado' }}</div>
+                  @if (detalle.rechazadoPorId !== null) {
+                    <div class="timeline__sub">{{ fmtFechaHora(detalle.fechaRechazo) }}</div>
+                  }
+                </div>
+              </li>
+            }
+          </ol>
+          @if (motivoSinAccion(detalle); as motivo) {
+            <div class="field-hint">{{ motivo }}</div>
+          }
+        </div>
 
         <div>
           <div class="section-label">Solicitud</div>
@@ -215,46 +269,62 @@
         }
       </div>
 
-      @if (detalle.estado === 'PENDIENTE' && canAprobar) {
+      @if (puedeActuar(detalle)) {
         <div class="drawer-footer drawer-footer--stack">
-          <button class="btn-confirm btn-confirm--wide" (click)="openAprobar(detalle)" type="button">
+          <button class="btn-confirm btn-confirm--wide" (click)="openAccion(detalle, 'aprobar')" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            Aprobar anticipo
+            {{ rolScope === 'ERLE' ? 'Aprobar y enviar al ENL' : 'Aprobar anticipo' }}
           </button>
-          <div class="field-hint field-hint--center">El rechazo es automático por saldo — no se rechaza manualmente.</div>
+          <button class="btn-reject btn-confirm--wide" (click)="openAccion(detalle, 'rechazar')" type="button">Rechazar anticipo</button>
         </div>
       }
     </div>
   }
 
-  <!-- ══════════════════════ MODAL: APROBAR ══════════════════════ -->
-  @if (aprobarTarget) {
+  <!-- ══════════════════════ MODAL: APROBAR / RECHAZAR ══════════════════════ -->
+  @if (accionTarget) {
     <div class="modal-overlay" role="button" tabindex="0" aria-label="Cerrar diálogo"
-      (click)="$event.target === $event.currentTarget && closeAprobar()"
-      (keydown.enter)="closeAprobar()" (keydown.escape)="closeAprobar()">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="aprobarModalTitle">
+      (click)="$event.target === $event.currentTarget && closeAccion()"
+      (keydown.enter)="closeAccion()" (keydown.escape)="closeAccion()">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="accionModalTitle">
         <div class="modal-body">
-          <div class="modal-icon modal-icon--ok">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <div class="modal-icon" [class.modal-icon--ok]="accionTarget.accion === 'aprobar'" [class.modal-icon--danger]="accionTarget.accion === 'rechazar'">
+            @if (accionTarget.accion === 'aprobar') {
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            } @else {
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            }
           </div>
-          <div>
-            <div class="modal-title" id="aprobarModalTitle">Aprobar anticipo #{{ aprobarTarget.id }}</div>
+          <div class="modal-main">
+            <div class="modal-title" id="accionModalTitle">{{ accionTarget.accion === 'aprobar' ? 'Aprobar' : 'Rechazar' }} anticipo #{{ accionTarget.anticipo.id }}</div>
             <div class="modal-desc">
-              {{ aprobarTarget.titulo }} · {{ aprobarTarget.equipoNombre }} · <strong>{{ cop(aprobarTarget.montoSolicitado) }}</strong>
+              {{ accionTarget.anticipo.titulo }} · {{ accionTarget.anticipo.equipoNombre }} · <strong>{{ cop(accionTarget.anticipo.montoSolicitado) }}</strong>
             </div>
-            <div class="modal-note">
-              Como <strong>ENL_RECURSOS</strong>, tu aprobación es final. El monto quedará registrado como ejecutado en la bolsa {{ TIPO_PRES[aprobarTarget.tipoPresupuesto].label }}.
-            </div>
+            @if (accionTarget.accion === 'aprobar') {
+              <div class="modal-note">
+                @if (rolScope === 'ERLE') {
+                  Como <strong>ERLE</strong>, tu aprobación pasa el anticipo al <strong>ENL</strong> para la aprobación final.
+                } @else {
+                  Como <strong>ENL</strong>, tu aprobación es final. El monto quedará registrado como ejecutado en la bolsa {{ TIPO_PRES[accionTarget.anticipo.tipoPresupuesto].label }}.
+                }
+              </div>
+            } @else {
+              <label class="field-label" for="accionObservaciones">Motivo del rechazo (obligatorio)</label>
+              <textarea id="accionObservaciones" class="accion-textarea" rows="3" [(ngModel)]="accionObservaciones" name="accionObservaciones"
+                placeholder="Explica por qué se rechaza la solicitud…" [disabled]="accionLoading"></textarea>
+              <div class="field-hint">Este texto se le notifica al solicitante.</div>
+            }
           </div>
         </div>
         <div class="modal-footer">
           <div class="modal-actions">
-            <button class="btn-cancel" (click)="closeAprobar()" type="button" [disabled]="aprobando">Cancelar</button>
-            <button class="btn-confirm" (click)="confirmarAprobar()" type="button" [disabled]="aprobando">
-              @if (aprobando) {
-                <span class="spinner-sm"></span> Aprobando…
+            <button class="btn-cancel" (click)="closeAccion()" type="button" [disabled]="accionLoading">Cancelar</button>
+            <button class="btn-confirm" [class.btn-confirm--danger]="accionTarget.accion === 'rechazar'" (click)="confirmarAccion()" type="button"
+              [disabled]="accionLoading || (accionTarget.accion === 'rechazar' && !accionRechazoValido)">
+              @if (accionLoading) {
+                <span class="spinner-sm"></span> Enviando…
               } @else {
-                Confirmar aprobación
+                {{ accionTarget.accion === 'aprobar' ? 'Confirmar aprobación' : 'Confirmar rechazo' }}
               }
             </button>
           </div>
